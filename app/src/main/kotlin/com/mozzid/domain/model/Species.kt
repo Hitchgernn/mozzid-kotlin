@@ -1,7 +1,5 @@
 package com.mozzid.domain.model
 
-import androidx.compose.ui.graphics.Color
-
 /**
  * When a species is typically biting. Used for the result screen's active-time
  * cross-check ("detected at an unusual hour").
@@ -30,5 +28,5 @@ data class Species(
     val activeLabel: String,    // human label, e.g. "Day · dawn/dusk"
     val note: String,
     val tips: List<String>,
-    val dotColor: Color,        // map-pin / list colour
+    val dotColorArgb: Long,     // map-pin / list colour, as ARGB (see [Severity])
 )

@@ -1,20 +1,18 @@
 package com.mozzid.domain.model
 
-import androidx.compose.ui.graphics.Color
-
 /**
  * Disease-risk severity. Colourblind-safe by contract: every level pairs a
  * distinct glyph shape AND a text label with its colour, so meaning never rides
  * on hue alone.
+ *
+ * The colour is a plain ARGB value, not a Compose `Color` — `domain/` stays pure
+ * Kotlin. `presentation/theme` turns it into a paintable colour along with the
+ * derived bg/border/iconBg tints.
  */
-enum class Severity(val glyph: String, val color: Color) {
-    HIGH("▲", Color(0xFFFF8A7A)),      // ▲
-    MODERATE("●", Color(0xFFFFCF6B)),  // ●
-    LOW("■", Color(0xFF7FD0FF));       // ■
-
-    val bg: Color get() = color.copy(alpha = 0.10f)
-    val border: Color get() = color.copy(alpha = 0.28f)
-    val iconBg: Color get() = color.copy(alpha = 0.16f)
+enum class Severity(val glyph: String, val colorArgb: Long) {
+    HIGH("▲", 0xFFFF8A7A),
+    MODERATE("●", 0xFFFFCF6B),
+    LOW("■", 0xFF7FD0FF);
 
     companion object {
         fun fromName(name: String): Severity =

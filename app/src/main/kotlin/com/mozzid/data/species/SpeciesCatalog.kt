@@ -1,6 +1,5 @@
 package com.mozzid.data.species
 
-import androidx.compose.ui.graphics.Color
 import com.mozzid.domain.model.ActiveWindow
 import com.mozzid.domain.model.Severity
 import com.mozzid.domain.model.Species
@@ -29,7 +28,7 @@ class SpeciesCatalog : SpeciesRepository {
             "Use screens and repellent during daylight hours.",
             "Wear long sleeves at dawn and dusk.",
         ),
-        dotColor = Color(0xFFFF8A7A),
+        dotColorArgb = 0xFFFF8A7A,
     )
 
     private val culex = Species(
@@ -49,7 +48,7 @@ class SpeciesCatalog : SpeciesRepository {
             "Sleep under a bed net at night.",
             "Fit window and door screens.",
         ),
-        dotColor = Color(0xFF7FD0FF),
+        dotColorArgb = 0xFF7FD0FF,
     )
 
     private val anopheles = Species(
@@ -69,7 +68,7 @@ class SpeciesCatalog : SpeciesRepository {
             "Use indoor residual spraying where advised.",
             "Cover skin after sunset.",
         ),
-        dotColor = Color(0xFFFFCF6B),
+        dotColorArgb = 0xFFFFCF6B,
     )
 
     private val everySpecies = listOf(aedes, culex, anopheles)

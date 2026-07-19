@@ -34,6 +34,7 @@ import com.mozzid.presentation.record.RecordPhase
 import com.mozzid.presentation.record.RecordViewModel
 import com.mozzid.presentation.theme.Dimens
 import com.mozzid.presentation.theme.MozzTheme
+import com.mozzid.presentation.theme.dotColor
 import com.mozzid.presentation.theme.MozzType
 
 /**

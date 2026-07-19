@@ -14,5 +14,11 @@ interface AudioRecorderService {
 
 /** Best-effort location boundary. Returns null when denied/unavailable. */
 interface LocationService {
+    suspend fun hasPermission(): Boolean
+
+    /** Prompts if not yet granted. Returns the resulting grant state. */
+    suspend fun requestPermission(): Boolean
+
+    /** Never throws — a missing fix must not cost us the detection. */
     suspend fun currentFix(): GeoFix?
 }

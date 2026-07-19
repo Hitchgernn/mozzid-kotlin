@@ -84,8 +84,11 @@ class RecordViewModel(
         val result = classifier.classify(AudioSample(filePath = path, durationMillis = duration))
         _state.value = _state.value.copy(phase = RecordPhase.RESULT, result = result)
 
-        // Save: real timestamp + best-effort GPS. Never blocks the result UI.
-        val fix = runCatching { location.currentFix() }.getOrNull()
+        // Save: real timestamp + best-effort GPS. The result is already on screen,
+        // so a denied or slow fix costs us coordinates, never the detection.
+        val fix = runCatching {
+            if (location.requestPermission()) location.currentFix() else null
+        }.getOrNull()
         val saved = detections.add(
             Detection(
                 speciesId = result.primary.id,

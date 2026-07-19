@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MozzID</string>
+    <string name="tagline">Kenali nyamuk dari kepakan sayapnya</string>
+    <string name="hold_to_listen">Tahan untuk mendengarkan</string>
+    <string name="analyzing">Menganalisis…</string>
+    <string name="history">Riwayat</string>
+    <string name="detections_near">Deteksi di sekitar Anda</string>
+</resources>

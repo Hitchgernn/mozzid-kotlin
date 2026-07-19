@@ -1,0 +1,51 @@
+name: mozzid
+description: MozzID — an offline-first mosquito-species identifier that classifies wingbeat audio on-device.
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.6.0 <4.0.0"
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # Local, offline-first storage
+  sqflite: ^2.3.3
+  path: ^1.9.0
+  path_provider: ^2.1.4
+
+  # Device capabilities
+  record: ^6.0.0 # microphone capture (aligned federated plugin set)
+  geolocator: ^12.0.0 # GPS tagging
+  permission_handler: ^11.3.1 # mic + location primers
+  flutter_local_notifications: ^17.2.3 # high-activity alerts
+  flutter_tts: ^4.0.2 # voice output of results
+  share_plus: ^10.0.2 # share result card / CSV
+  csv: ^6.0.0 # detection-log export
+
+  intl: any
+  collection: ^1.18.0
+
+  # Design fonts (Spectral / IBM Plex Sans / IBM Plex Mono). Fetched & cached on
+  # first launch; bundle the TTFs under assets/fonts for guaranteed offline type.
+  google_fonts: ^6.2.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  generate: true # builds l10n from lib/l10n/*.arb
+  assets:
+    # Bundled Spectral / IBM Plex fonts so google_fonts serves them offline
+    # (no first-launch network fetch / text reflow).
+    - assets/google_fonts/

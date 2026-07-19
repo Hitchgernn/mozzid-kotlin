@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MozzID</string>
+    <string name="tagline">Identify a mosquito by its wingbeat</string>
+    <string name="hold_to_listen">Hold to listen</string>
+    <string name="analyzing">Analyzing…</string>
+    <string name="history">History</string>
+    <string name="detections_near">Detections near you</string>
+</resources>

@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#05070b">
+<title>MozzID — Mosquito species identifier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body { background:#05070b; font-family:'IBM Plex Sans',sans-serif; }
+  a { color:var(--accent); text-decoration:none; }
+  a:hover { color:var(--accent-hi); }
+  ::-webkit-scrollbar { width:0; height:0; }
+  button { font-family:inherit; }
+  @keyframes mzFloat { 0%,100%{ transform:translateY(0) rotate(-1deg);} 50%{ transform:translateY(-9px) rotate(1deg);} }
+  @keyframes mzWing { 0%,100%{ transform:scaleY(1) rotate(-28deg);} 50%{ transform:scaleY(0.7) rotate(-34deg);} }
+  @keyframes mzWingR { 0%,100%{ transform:scaleY(1) rotate(28deg);} 50%{ transform:scaleY(0.7) rotate(34deg);} }
+  @keyframes mzRing { 0%{ transform:scale(0.55); opacity:0.55;} 80%{ opacity:0.06;} 100%{ transform:scale(1.5); opacity:0;} }
+  @keyframes mzBar { 0%,100%{ transform:scaleY(0.28);} 50%{ transform:scaleY(1);} }
+  @keyframes mzSpec { 0%{ transform:scaleY(0.15);} 100%{ transform:scaleY(1);} }
+  @keyframes mzFade { from{ opacity:0; transform:translateY(14px);} to{ opacity:1; transform:translateY(0);} }
+  @keyframes mzPop { 0%{ opacity:0; transform:scale(0.9);} 100%{ opacity:1; transform:scale(1);} }
+  @keyframes mzGlow { 0%,100%{ box-shadow:0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent), 0 20px 60px -18px color-mix(in srgb, var(--accent) 50%, transparent);} 50%{ box-shadow:0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent), 0 26px 80px -14px color-mix(in srgb, var(--accent) 75%, transparent);} }
+  @keyframes mzPin { 0%{ transform:translate(-50%,-100%) scale(0);} 60%{ transform:translate(-50%,-100%) scale(1.15);} 100%{ transform:translate(-50%,-100%) scale(1);} }
+  @keyframes mzSlide { from{ transform:translateY(101%);} to{ transform:translateY(0);} }
+  @keyframes mzDot { 0%,100%{ opacity:0.3;} 50%{ opacity:1;} }
+  @keyframes mzScan { 0%{ transform:translateX(-100%);} 100%{ transform:translateX(220%);} }
+  .mzScreen { animation:mzFade 0.4s cubic-bezier(.2,.7,.2,1) both; }
+  #stage { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:40px 20px; background:radial-gradient(1200px 700px at 50% -10%, #0d1520 0%, #05070b 60%); }
+  #device { position:relative; width:392px; height:844px; max-width:100vw; border-radius:52px; padding:11px; background:linear-gradient(150deg,#242c38,#0c0f15 55%); box-shadow:0 50px 120px -30px rgba(0,0,0,0.85), 0 0 0 1px var(--fill,rgba(255,255,255,0.04)); }
+  @media (max-width:430px){ #stage{ padding:0; } #device{ width:100vw; height:100vh; height:100dvh; border-radius:0; padding:0; } #screen{ border-radius:0 !important; } }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="device">
+    <div id="screen"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+(function () {
+
+  // ---------- data ----------
+  var STR = {
+    EN: {
+      offline:'Works offline', heardBuzz:'Heard a buzz?', tapHold:'Tap and hold near the sound.',
+      holdSteady:'~4s · stay close · minimize noise', listeningHold:'Listening… hold steady',
+      matching:'Matching wingbeat frequency…', onDevice:'Running on-device model · offline',
+      recordAgain:'Record again', speaking:'Speaking result', carries:'Carries', identifiedAs:'Identified as',
+      confidence:'Confidence', wingbeat:'Wingbeat freq.', couldAlso:'Could also be', saveLog:'Save to log',
+      history:'History', record:'Record', settings:'Settings', logged:'logged', totalDetections:'Total detections',
+      mostActive:'Most active', detectionsNear:'Your detections · offline map', language:'Language',
+      langNote:'Bahasa Indonesia / English', voiceOut:'Voice output', voiceNote:'Speak the result aloud',
+      bgListen:'Background listening', bgNote:'Listen overnight · battery-aware', morningReady:'Morning summary ready',
+      viewSummary:'View last night →', notifications:'Notifications', previewNotif:'Preview a notification',
+      data:'Data', exportCsv:'Export data (CSV)', replayIntro:'Replay intro', emptyTitle:'No detections yet',
+      emptyBody:'Catch your first buzz and it will appear here, tagged with time and place.',
+      activeHours:'Active hours', prevention:'Prevention', close:'Close',
+      appearance:'Appearance', appearanceNote:'Light or dark theme', dark:'Dark', light:'Light', accentLabel:'Accent colour', accentNote:'Tap a colour to apply it everywhere.',
+      goodMorning:'GOOD MORNING', morningHead:'3 mosquitoes detected overnight', overnightTimeline:'Overnight timeline',
+      gotIt:'Got it', skip:'Skip', micTitle:'Microphone', micNote:'To hear the wingbeat', allow:'Allow',
+      locTitle:'Location', locNote:'To map detections', notif1Title:'High dengue-vector activity tonight',
+      notif1Body:'3 Aedes detections logged near you in the last hour.', notif2Title:'Dusk is peak biting hour',
+      notif2Body:'Aedes are most active now — a good time to check.',
+    },
+    ID: {
+      offline:'Berfungsi offline', heardBuzz:'Dengar nyamuk?', tapHold:'Tekan & tahan dekat suaranya.',
+      holdSteady:'~4d · dekatkan · kurangi bising', listeningHold:'Mendengarkan… tahan stabil',
+      matching:'Mencocokkan frekuensi sayap…', onDevice:'Model di perangkat · offline',
+      recordAgain:'Rekam lagi', speaking:'Membacakan hasil', carries:'Membawa', identifiedAs:'Teridentifikasi sebagai',
+      confidence:'Keyakinan', wingbeat:'Frek. sayap', couldAlso:'Bisa juga', saveLog:'Simpan ke log',
+      history:'Riwayat', record:'Rekam', settings:'Pengaturan', logged:'tercatat', totalDetections:'Total deteksi',
+      mostActive:'Paling aktif', detectionsNear:'Deteksi Anda · peta offline', language:'Bahasa',
+      langNote:'Bahasa Indonesia / English', voiceOut:'Keluaran suara', voiceNote:'Bacakan hasil dengan suara',
+      bgListen:'Dengar latar', bgNote:'Dengar semalam · hemat baterai', morningReady:'Ringkasan pagi siap',
+      viewSummary:'Lihat semalam →', notifications:'Notifikasi', previewNotif:'Pratinjau notifikasi',
+      data:'Data', exportCsv:'Ekspor data (CSV)', replayIntro:'Ulangi intro', emptyTitle:'Belum ada deteksi',
+      emptyBody:'Tangkap dengungan pertama, akan muncul di sini dengan waktu & lokasi.',
+      activeHours:'Jam aktif', prevention:'Pencegahan', close:'Tutup',
+      appearance:'Tampilan', appearanceNote:'Tema terang atau gelap', dark:'Gelap', light:'Terang', accentLabel:'Warna aksen', accentNote:'Ketuk warna untuk menerapkannya.',
+      goodMorning:'SELAMAT PAGI', morningHead:'3 nyamuk terdeteksi semalam', overnightTimeline:'Linimasa semalam',
+      gotIt:'Mengerti', skip:'Lewati', micTitle:'Mikrofon', micNote:'Untuk mendengar sayap', allow:'Izinkan',
+      locTitle:'Lokasi', locNote:'Untuk memetakan deteksi', notif1Title:'Aktivitas vektor dengue tinggi malam ini',
+      notif1Body:'3 deteksi Aedes tercatat di dekat Anda dalam sejam terakhir.', notif2Title:'Senja jam puncak gigitan',
+      notif2Body:'Aedes paling aktif sekarang — saat tepat untuk cek.',
+    },
+  };
+
+  var DB = {
+    aedes:     { name:'Aedes aegypti', common:'Yellow fever mosquito', diseases:'Dengue & Zika', freq:'~600 Hz', freqRange:'450–700 Hz', sev:'high',
+      active:'Day · dawn/dusk', note:'A daytime biter thriving in urban water containers. The primary vector of dengue across tropical cities.',
+      tips:['Empty standing water in pots, tyres and gutters weekly.','Use screens and repellent during daylight hours.','Wear long sleeves at dawn and dusk.'] },
+    culex:     { name:'Culex quinquefasciatus', common:'Southern house mosquito', diseases:'West Nile & filariasis', freq:'~350 Hz', freqRange:'300–450 Hz', sev:'moderate',
+      active:'Night', note:'A night-active house mosquito, drawn to polluted stagnant water. A vector of lymphatic filariasis.',
+      tips:['Clear drains and polluted stagnant water.','Sleep under a bed net at night.','Fit window and door screens.'] },
+    anopheles: { name:'Anopheles sundaicus', common:'Malaria mosquito', diseases:'Malaria', freq:'~500 Hz', freqRange:'400–600 Hz', sev:'high',
+      active:'Night · dusk to dawn', note:'The malaria vector, biting from dusk to dawn. Rests at a distinctive head-down angle.',
+      tips:['Sleep under an insecticide-treated net.','Use indoor residual spraying where advised.','Cover skin after sunset.'] },
+  };
+
+  var SEV = {
+    high:     { glyph:'▲', color:'#ff8a7a', label:'High risk',    bg:'rgba(255,138,122,0.1)',  border:'rgba(255,138,122,0.28)', iconBg:'rgba(255,138,122,0.16)' },
+    moderate: { glyph:'●', color:'#ffcf6b', label:'Moderate risk',bg:'rgba(255,207,107,0.09)', border:'rgba(255,207,107,0.26)', iconBg:'rgba(255,207,107,0.15)' },
+    low:      { glyph:'■', color:'#7fd0ff', label:'Low risk',     bg:'rgba(127,208,255,0.08)', border:'rgba(127,208,255,0.24)', iconBg:'rgba(127,208,255,0.14)' },
+  };
+  var DOT = { aedes:'#ff8a7a', culex:'#7fd0ff', anopheles:'#ffcf6b' };
+  var ACCENTS = {
+    teal:   { a:'#2dd4bf', a2:'#12a695', hi:'#34e6d1', ink:'#04211d' },
+    lime:   { a:'#84cc16', a2:'#4d7c0f', hi:'#bef264', ink:'#152400' },
+    amber:  { a:'#f5a623', a2:'#b45309', hi:'#fbbf24', ink:'#2a1600' },
+    indigo: { a:'#8b93f8', a2:'#4f46e5', hi:'#a5b4fc', ink:'#0a0f2a' },
+  };
+
+  // ---------- state ----------
+  var S = {
+    lang:'EN', tab:'record', phase:'idle', onboarded:false, obStep:0,
+    theme:'dark', accent:'teal', progress:0, result:null, speciesId:null,
+    morningOpen:false, showNotif:false, toast:null, filterSpecies:'all', filterRange:'all',
+    voice:false, background:true,
+    log:[
+      { id:1, sp:'aedes',    time:'11:42 PM', loc:'Bedroom',  date:'Tonight',    conf:87, days:0, left:'40%', top:'55%' },
+      { id:2, sp:'culex',    time:'10:05 PM', loc:'Balcony',  date:'Tonight',    conf:79, days:0, left:'68%', top:'38%' },
+      { id:3, sp:'aedes',    time:'6:20 AM',  loc:'Kitchen',  date:'Yesterday',  conf:91, days:1, left:'25%', top:'70%' },
+      { id:4, sp:'anopheles',time:'2:15 AM',  loc:'Bedroom',  date:'2 days ago', conf:74, days:2, left:'55%', top:'25%' },
+      { id:5, sp:'aedes',    time:'7:50 PM',  loc:'Garden',   date:'4 days ago', conf:83, days:4, left:'80%', top:'62%' },
+      { id:6, sp:'culex',    time:'9:30 PM',  loc:'Living rm',date:'6 days ago', conf:68, days:6, left:'18%', top:'40%' },
+    ],
+  };
+
+  // ---------- timers ----------
+  var T = {};
+  function set(patch){ for (var k in patch) S[k] = patch[k]; render(); }
+
+  // ---------- mascot ----------
+  function mascot(sz){
+    return '<svg width="'+sz+'" height="'+sz+'" viewBox="0 0 120 120" fill="none" style="overflow:visible">'
+      + '<ellipse cx="46" cy="44" rx="27" ry="11" fill="rgba(45,212,191,0.22)" stroke="rgba(45,212,191,0.4)" stroke-width="1" style="transform-origin:46px 44px; animation:mzWing 0.5s ease-in-out infinite"/>'
+      + '<ellipse cx="74" cy="44" rx="27" ry="11" fill="rgba(45,212,191,0.22)" stroke="rgba(45,212,191,0.4)" stroke-width="1" style="transform-origin:74px 44px; animation:mzWingR 0.5s ease-in-out infinite"/>'
+      + '<line x1="60" y1="70" x2="52" y2="104" stroke="#0e9384" stroke-width="2.5" stroke-linecap="round"/>'
+      + '<line x1="60" y1="72" x2="68" y2="104" stroke="#0e9384" stroke-width="2.5" stroke-linecap="round"/>'
+      + '<line x1="56" y1="68" x2="40" y2="96" stroke="#0e9384" stroke-width="2.5" stroke-linecap="round"/>'
+      + '<line x1="64" y1="68" x2="80" y2="96" stroke="#0e9384" stroke-width="2.5" stroke-linecap="round"/>'
+      + '<ellipse cx="60" cy="82" rx="15" ry="24" fill="#17b9a6"/>'
+      + '<line x1="47" y1="80" x2="73" y2="80" stroke="rgba(4,33,29,0.25)" stroke-width="2"/>'
+      + '<line x1="48" y1="90" x2="72" y2="90" stroke="rgba(4,33,29,0.25)" stroke-width="2"/>'
+      + '<circle cx="60" cy="58" r="13" fill="#20c4b1"/>'
+      + '<circle cx="60" cy="42" r="15" fill="#34e6d1"/>'
+      + '<circle cx="54" cy="41" r="5.5" fill="var(--accent-ink)"/>'
+      + '<circle cx="66" cy="41" r="5.5" fill="var(--accent-ink)"/>'
+      + '<circle cx="55.6" cy="39.4" r="1.9" fill="#fff"/>'
+      + '<circle cx="67.6" cy="39.4" r="1.9" fill="#fff"/>'
+      + '<line x1="60" y1="52" x2="60" y2="66" stroke="#0e9384" stroke-width="2" stroke-linecap="round"/>'
+      + '<line x1="53" y1="30" x2="46" y2="16" stroke="#34e6d1" stroke-width="2" stroke-linecap="round"/>'
+      + '<line x1="67" y1="30" x2="74" y2="16" stroke="#34e6d1" stroke-width="2" stroke-linecap="round"/>'
+      + '<circle cx="46" cy="15" r="2.6" fill="#34e6d1"/>'
+      + '<circle cx="74" cy="15" r="2.6" fill="#34e6d1"/>'
+      + '</svg>';
+  }
+
+  // ---------- handlers ----------
+  var App = {
+    startHold:function(){
+      if (S.phase !== 'idle') return;
+      set({ phase:'listening', progress:0, showNotif:false });
+      var dur = 4000, t0 = performance.now();
+      function step(){
+        var p = Math.min(100, ((performance.now()-t0)/dur)*100);
+        S.progress = p;
+        var ring = document.getElementById('progRing');
+        var pct = document.getElementById('progPct');
+        if (ring){ ring.setAttribute('stroke-dashoffset', CIRC*(1-p/100)); }
+        if (pct){ pct.textContent = Math.round(p)+'%'; }
+        if (p >= 100){ App.finishListen(); return; }
+        T.raf = requestAnimationFrame(step);
+      }
+      T.raf = requestAnimationFrame(step);
+    },
+    endHold:function(){
+      if (S.phase !== 'listening') return;
+      if (S.progress >= 100) return;
+      cancelAnimationFrame(T.raf);
+      set({ phase:'idle', progress:0 });
+    },
+    finishListen:function(){
+      cancelAnimationFrame(T.raf);
+      set({ phase:'analyzing' });
+      T.ana = setTimeout(function(){
+        var ids = ['aedes','culex','anopheles'];
+        var primary = ids[Math.floor(Math.random()*ids.length)];
+        var runner = ids[Math.floor(Math.random()*ids.length)];
+        while (runner === primary) runner = ids[Math.floor(Math.random()*ids.length)];
+        var conf = 78 + Math.floor(Math.random()*17);
+        var rconf = 100 - conf - Math.floor(Math.random()*6);
+        set({ phase:'result', result:{ primary:primary, runner:runner, conf:conf, rconf:Math.max(3,rconf) } });
+      }, 1700);
+    },
+    retry:function(){ set({ phase:'idle', progress:0, result:null }); },
+    saveResult:function(){
+      var r = S.result; if (!r) return;
+      var entry = { id:Date.now(), sp:r.primary, time:'Just now', loc:'Current spot', date:'Tonight', conf:r.conf, days:0, left:(30+Math.random()*40)+'%', top:(30+Math.random()*40)+'%' };
+      S.log = [entry].concat(S.log);
+      set({ phase:'idle', progress:0, result:null, tab:'history' });
+      toast(S.lang==='EN' ? 'Saved to log' : 'Tersimpan ke log');
+    },
+    shareResult:function(){ toast(S.lang==='EN' ? 'Shareable card created' : 'Kartu berbagi dibuat'); },
+    openSpeciesId:function(id){ set({ speciesId:id }); },
+    closeSpecies:function(){ set({ speciesId:null }); },
+    setTab:function(t){ set({ tab:t, showNotif:false }); },
+    toggleVoice:function(){ set({ voice:!S.voice }); },
+    toggleBackground:function(){ set({ background:!S.background }); },
+    setLang:function(l){ set({ lang:l }); },
+    setDark:function(){ set({ theme:'dark' }); },
+    setLight:function(){ set({ theme:'light' }); },
+    setAccent:function(a){ set({ accent:a }); },
+    openMorning:function(){ set({ morningOpen:true }); },
+    closeMorning:function(){ set({ morningOpen:false }); },
+    previewNotif:function(){ set({ showNotif:true }); clearTimeout(T.notif2); T.notif2 = setTimeout(function(){ set({ showNotif:false }); }, 4500); },
+    exportData:function(){ toast(S.lang==='EN' ? 'Exported mozzid_log.csv' : 'Diekspor mozzid_log.csv'); },
+    replayOnboard:function(){ set({ onboarded:false, obStep:0 }); },
+    nextOnboard:function(){ if (S.obStep < 2) set({ obStep:S.obStep+1 }); else App.finishOnboard(); },
+    finishOnboard:function(){ set({ onboarded:true, obStep:0 }); scheduleNotif(1200, 4200); },
+    setFilterSpecies:function(id){ set({ filterSpecies:id }); },
+    setFilterRange:function(id){ set({ filterRange:id }); },
+    noop:function(e){ if (e) e.stopPropagation(); },
+  };
+  window.App = App;
+
+  function toast(msg){
+    clearTimeout(T.toast);
+    set({ toast:msg });
+    T.toast = setTimeout(function(){ set({ toast:null }); }, 2200);
+  }
+  function scheduleNotif(showAt, hideAt){
+    clearTimeout(T.notif); clearTimeout(T.notif2);
+    T.notif = setTimeout(function(){ set({ showNotif:true }); }, showAt);
+    T.notif2 = setTimeout(function(){ set({ showNotif:false }); }, hideAt);
+  }
+
+  // ---------- derive theme ----------
+  var CIRC = 2 * Math.PI * 126;
+
+  function themeVars(){
+    var dark = S.theme !== 'light';
+    var AC = ACCENTS[S.accent] || ACCENTS.teal;
+    var TT = dark
+      ? { bg:'#080b11', s1:'#0f141d', s2:'#0d121a', s3:'#0c1119', t1:'#eef3f9', t2:'#c6d0dd', t3:'#93a1b3', t4:'#6b7788', fa:'#4a5567', ln:'rgba(255,255,255,0.06)', ln2:'rgba(255,255,255,0.12)', fl:'rgba(255,255,255,0.04)' }
+      : { bg:'#e7ebf1', s1:'#ffffff', s2:'#eef2f7', s3:'#ffffff', t1:'#0f1720', t2:'#33414f', t3:'#5a6675', t4:'#8592a1', fa:'#aeb8c4', ln:'rgba(16,24,35,0.10)', ln2:'rgba(16,24,35,0.18)', fl:'rgba(16,24,35,0.05)' };
+    var softText = dark ? AC.hi : AC.a2;
+    return { dark:dark, AC:AC,
+      vars:'--bg:'+TT.bg+'; --surface:'+TT.s1+'; --surface2:'+TT.s2+'; --surface3:'+TT.s3+'; --text:'+TT.t1+'; --text2:'+TT.t2+'; --text3:'+TT.t3+'; --text4:'+TT.t4+'; --faint:'+TT.fa+'; --line:'+TT.ln+'; --line2:'+TT.ln2+'; --fill:'+TT.fl+'; --accent:'+AC.a+'; --accent2:'+AC.a2+'; --accent-hi:'+AC.hi+'; --accent-ink:'+AC.ink+'; --accent-soft-text:'+softText+';',
+      softText:softText };
+  }
+
+  // ---------- screens ----------
+  function statusBar(){
+    return '<div style="position:absolute; top:0; left:0; right:0; height:52px; z-index:40; display:flex; align-items:flex-end; justify-content:space-between; padding:0 28px 8px; font-family:\'IBM Plex Mono\',monospace; font-size:14px; font-weight:600; color:var(--text); pointer-events:none;">'
+      + '<span>2:14</span>'
+      + '<div style="position:absolute; left:50%; top:9px; transform:translateX(-50%); width:112px; height:30px; background:#000; border-radius:16px;"></div>'
+      + '<div style="display:flex; gap:6px; align-items:center;"><span style="font-size:12px; letter-spacing:0.5px;">5G</span>'
+      + '<div style="width:24px; height:12px; border:1.5px solid var(--text); border-radius:3px; position:relative;"><div style="position:absolute; inset:1.5px; right:6px; background:var(--text); border-radius:1px;"></div></div></div></div>';
+  }
+
+  function recordScreen(L){
+    var idle = S.phase === 'idle', listening = S.phase === 'listening', analyzing = S.phase === 'analyzing';
+    var pct = Math.round(S.progress);
+    var recordArea = '';
+    if (idle){
+      recordArea = '<div style="position:relative; width:264px; height:264px; display:flex; align-items:center; justify-content:center;">'
+        + '<div style="position:absolute; inset:0; border-radius:50%; border:1px solid color-mix(in srgb, var(--accent) 14%, transparent);"></div>'
+        + '<div style="position:absolute; inset:26px; border-radius:50%; border:1px solid color-mix(in srgb, var(--accent) 10%, transparent);"></div>'
+        + '<button onpointerdown="App.startHold()" onpointerup="App.endHold()" onpointerleave="App.endHold()" style="position:relative; width:184px; height:184px; border-radius:50%; border:none; cursor:pointer; background:radial-gradient(circle at 50% 38%, var(--accent-hi) 0%, var(--accent2) 55%, var(--accent2) 100%); animation:mzGlow 3.4s ease-in-out infinite; display:flex; align-items:center; justify-content:center; touch-action:none;">'
+        + '<svg width="52" height="52" viewBox="0 0 24 24" fill="none"><rect x="9" y="3" width="6" height="12" rx="3" fill="var(--accent-ink)"/><path d="M6 11a6 6 0 0 0 12 0M12 17v3.5" stroke="var(--accent-ink)" stroke-width="1.9" stroke-linecap="round"/></svg>'
+        + '</button></div>';
+    } else if (listening){
+      recordArea = '<div style="position:relative; width:264px; height:264px; display:flex; align-items:center; justify-content:center;">'
+        + '<span style="position:absolute; width:190px; height:190px; border-radius:50%; background:color-mix(in srgb, var(--accent) 16%, transparent); animation:mzRing 2.4s ease-out infinite;"></span>'
+        + '<span style="position:absolute; width:190px; height:190px; border-radius:50%; background:color-mix(in srgb, var(--accent) 13%, transparent); animation:mzRing 2.4s ease-out infinite; animation-delay:0.8s;"></span>'
+        + '<span style="position:absolute; width:190px; height:190px; border-radius:50%; background:color-mix(in srgb, var(--accent) 10%, transparent); animation:mzRing 2.4s ease-out infinite; animation-delay:1.6s;"></span>'
+        + '<svg width="264" height="264" viewBox="0 0 264 264" style="position:absolute; transform:rotate(-90deg);">'
+        + '<circle cx="132" cy="132" r="126" fill="none" stroke="var(--line)" stroke-width="5"/>'
+        + '<circle id="progRing" cx="132" cy="132" r="126" fill="none" stroke="var(--accent)" stroke-width="5" stroke-linecap="round" stroke-dasharray="'+CIRC+'" stroke-dashoffset="'+(CIRC*(1-S.progress/100))+'" style="transition:stroke-dashoffset 0.08s linear; filter:drop-shadow(0 0 6px color-mix(in srgb, var(--accent) 60%, transparent));"/></svg>'
+        + '<button onpointerup="App.endHold()" onpointerleave="App.endHold()" style="position:relative; z-index:2; width:184px; height:184px; border-radius:50%; border:none; cursor:pointer; background:radial-gradient(circle at 50% 38%, var(--accent-hi) 0%, var(--accent2) 70%); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; touch-action:none;">'
+        + '<div style="display:flex; align-items:flex-end; gap:4px; height:44px;">'
+        + bar('0s')+bar('0.12s')+bar('0.24s')+bar('0.36s')+bar('0.18s')+bar('0.30s')
+        + '</div><span id="progPct" style="font-family:\'IBM Plex Mono\',monospace; font-size:13px; font-weight:600; color:var(--accent-ink);">'+pct+'%</span></button></div>';
+    } else if (analyzing){
+      var bars = '';
+      for (var i=0;i<32;i++){
+        var v = 15 + Math.round(60*Math.abs(Math.sin(i*0.6))) + Math.round(Math.random()*20);
+        bars += '<span style="flex:1; background:linear-gradient(180deg,var(--accent),var(--accent2)); border-radius:1px; transform-origin:bottom; height:'+v+'%; opacity:0.85; animation:mzSpec 0.9s ease-in-out infinite alternate; animation-delay:'+(i*0.03).toFixed(2)+'s;"></span>';
+      }
+      recordArea = '<div style="width:100%; display:flex; flex-direction:column; align-items:center; gap:26px;">'
+        + '<div style="position:relative; width:280px; height:120px; border-radius:16px; overflow:hidden; background:var(--surface3); border:1px solid color-mix(in srgb, var(--accent) 14%, transparent); display:flex; align-items:flex-end; gap:2px; padding:10px;">'
+        + '<div style="position:absolute; top:0; bottom:0; width:60px; background:linear-gradient(90deg,transparent,color-mix(in srgb, var(--accent) 28%, transparent),transparent); animation:mzScan 1.6s linear infinite; z-index:2;"></div>'
+        + bars + '</div>'
+        + '<div style="text-align:center;"><div style="display:inline-flex; align-items:center; gap:8px; font-family:\'IBM Plex Mono\',monospace; font-size:14px; color:var(--accent-soft-text);">'
+        + '<span style="width:6px; height:6px; border-radius:50%; background:var(--accent); animation:mzDot 1s infinite;"></span>'+L.matching+'</div>'
+        + '<p style="margin-top:8px; font-size:12.5px; color:var(--text4);">'+L.onDevice+'</p></div></div>';
+    }
+    var footer = '';
+    if (idle) footer = '<p style="text-align:center; font-size:12.5px; color:var(--text4); font-family:\'IBM Plex Mono\',monospace;">'+L.holdSteady+'</p>';
+    else if (listening) footer = '<p style="text-align:center; font-size:13.5px; color:var(--accent-soft-text); font-weight:500;">'+L.listeningHold+'</p>';
+
+    return '<div class="mzScreen" style="position:absolute; inset:0; padding:64px 24px 96px; display:flex; flex-direction:column;">'
+      + '<div style="display:flex; align-items:center; justify-content:space-between;">'
+      + '<button onclick="App.setTab(\'history\')" style="width:44px; height:44px; border-radius:14px; border:1px solid var(--line2); background:var(--fill); display:flex; align-items:center; justify-content:center; cursor:pointer;">'
+      + '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="var(--text2)" stroke-width="1.7"/><path d="M12 7.5V12l3 2" stroke="var(--text2)" stroke-width="1.7" stroke-linecap="round"/></svg></button>'
+      + '<div style="display:flex; align-items:center; gap:7px; padding:7px 13px; border-radius:999px; background:color-mix(in srgb, var(--accent) 9%, transparent); border:1px solid color-mix(in srgb, var(--accent) 22%, transparent);">'
+      + '<span style="width:7px; height:7px; border-radius:50%; background:var(--accent); box-shadow:0 0 8px var(--accent);"></span>'
+      + '<span style="font-size:12px; font-weight:600; color:var(--accent-soft-text); letter-spacing:0.2px;">'+L.offline+'</span></div>'
+      + '<button onclick="App.setTab(\'settings\')" style="width:44px; height:44px; border-radius:14px; border:1px solid var(--line2); background:var(--fill); display:flex; align-items:center; justify-content:center; cursor:pointer;">'
+      + '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="1.6" fill="var(--text2)"/><circle cx="12" cy="12" r="9" stroke="var(--text2)" stroke-width="1.7"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3" stroke="var(--text2)" stroke-width="1.7" stroke-linecap="round"/></svg></button></div>'
+      + '<div style="margin-top:30px; text-align:center;"><h1 style="font-family:\'Spectral\',serif; font-weight:600; font-size:27px; line-height:1.22; color:var(--text); letter-spacing:-0.2px; text-wrap:balance;">'+L.heardBuzz+'</h1>'
+      + '<p style="margin-top:10px; font-size:14.5px; color:var(--text3); line-height:1.5;">'+L.tapHold+'</p></div>'
+      + '<div style="flex:1; display:flex; align-items:center; justify-content:center; position:relative;">'+recordArea+'</div>'
+      + footer + '</div>';
+  }
+  function bar(delay){
+    return '<span style="width:5px; background:var(--accent-ink); border-radius:3px; height:100%; transform-origin:bottom; animation:mzBar 0.7s ease-in-out infinite; animation-delay:'+delay+';"></span>';
+  }
+
+  function resultScreen(L){
+    var r = S.result; if (!r) return '';
+    var p = DB[r.primary], sev = SEV[p.sev], rn = DB[r.runner];
+    var acc = 'var(--accent)';
+    var activeID = { 'Day · dawn/dusk':'siang · fajar/senja', 'Night':'malam', 'Night · dusk to dawn':'malam · senja hingga fajar' };
+    var activeLoc = S.lang==='EN' ? p.active : (activeID[p.active] || p.active);
+    var isDay = p.active.indexOf('Day') >= 0;
+    var timeGood = !isDay;
+    var timeColor = timeGood ? acc : '#ffcf6b';
+    var timeBg = timeGood ? 'color-mix(in srgb, var(--accent) 7%, transparent)' : 'rgba(255,207,107,0.08)';
+    var timeBorder = timeGood ? 'color-mix(in srgb, var(--accent) 20%, transparent)' : 'rgba(255,207,107,0.24)';
+    var timeTitle = timeGood ? (S.lang==='EN'?'Consistent with active hours':'Sesuai jam aktif') : (S.lang==='EN'?'Unusual hour for this species':'Jam tak biasa untuk spesies ini');
+    var genus = p.name.split(' ')[0];
+    var timeNote = timeGood
+      ? (S.lang==='EN'?'Detected at 2:14 AM — within '+activeLoc+', its typical biting window.':'Terdeteksi 02:14 — dalam jam aktifnya ('+activeLoc+'), jam gigitnya.')
+      : (S.lang==='EN'?genus+' is a daytime biter, yet this was heard at night. Worth a second capture.':genus+' menggigit siang, tapi terdengar malam. Coba rekam ulang.');
+    var confCirc = 2*Math.PI*24, confOffset = confCirc*(1-r.conf/100);
+
+    var voiceChip = S.voice
+      ? '<div style="display:flex; align-items:center; gap:7px; padding:7px 12px; border-radius:999px; background:color-mix(in srgb, var(--accent) 10%, transparent); border:1px solid color-mix(in srgb, var(--accent) 22%, transparent);">'
+        + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 9v6h4l5 4V5L8 9H4z" fill="var(--accent)"/><path d="M16 9a3.5 3.5 0 0 1 0 6" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/></svg>'
+        + '<span style="font-size:11.5px; color:var(--accent-soft-text); font-weight:600;">'+L.speaking+'</span>'
+        + '<span style="width:5px; height:5px; border-radius:50%; background:var(--accent); animation:mzDot 0.9s infinite;"></span></div>'
+      : '';
+
+    return '<div class="mzScreen" style="position:absolute; inset:0; padding:60px 0 96px; overflow-y:auto; background:var(--bg);"><div style="padding:0 22px;">'
+      + '<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">'
+      + '<button onclick="App.retry()" style="display:flex; align-items:center; gap:6px; padding:8px 12px; border-radius:12px; border:1px solid var(--line2); background:var(--fill); color:var(--text2); font-size:13px; cursor:pointer;">'
+      + '<svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M15 6l-6 6 6 6" stroke="var(--text2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'+L.recordAgain+'</button>'
+      + voiceChip + '</div>'
+      // severity banner
+      + '<div style="border-radius:18px; padding:15px 16px; display:flex; align-items:center; gap:13px; background:'+sev.bg+'; border:1px solid '+sev.border+';">'
+      + '<div style="width:40px; height:40px; border-radius:11px; flex-shrink:0; display:flex; align-items:center; justify-content:center; background:'+sev.iconBg+';">'
+      + '<span style="font-family:\'IBM Plex Mono\',monospace; font-weight:700; font-size:19px; color:'+sev.color+';">'+sev.glyph+'</span></div>'
+      + '<div style="flex:1;"><div style="font-size:11px; letter-spacing:1px; text-transform:uppercase; color:'+sev.color+'; font-weight:700;">'+sev.label+'</div>'
+      + '<div style="font-size:15px; color:var(--text); font-weight:600; margin-top:2px;">'+L.carries+' '+p.diseases+'</div></div></div>'
+      // species
+      + '<div style="margin-top:20px; display:flex; gap:16px; align-items:center;">'
+      + '<div style="width:88px; height:88px; border-radius:18px; flex-shrink:0; overflow:hidden; position:relative; background:repeating-linear-gradient(135deg,var(--surface2),var(--surface2) 7px,var(--surface3) 7px,var(--surface3) 14px); border:1px solid var(--line); display:flex; align-items:center; justify-content:center;">'
+      + '<span style="font-family:\'IBM Plex Mono\',monospace; font-size:9px; color:var(--faint); text-align:center; line-height:1.3;">photo</span></div>'
+      + '<div style="flex:1;"><div style="font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--text4); font-weight:600;">'+L.identifiedAs+'</div>'
+      + '<button onclick="App.openSpeciesId(\''+r.primary+'\')" style="text-align:left; background:none; border:none; padding:0; cursor:pointer;">'
+      + '<h2 style="font-family:\'Spectral\',serif; font-style:italic; font-weight:600; font-size:26px; color:var(--text); line-height:1.1; margin-top:3px;">'+p.name+'</h2></button>'
+      + '<div style="font-size:13px; color:var(--text3); margin-top:4px;">'+p.common+'</div></div></div>'
+      // metrics
+      + '<div style="margin-top:20px; display:grid; grid-template-columns:1fr 1fr; gap:12px;">'
+      + '<div style="border-radius:16px; padding:16px; background:var(--surface); border:1px solid var(--line); display:flex; align-items:center; gap:14px;">'
+      + '<svg width="58" height="58" viewBox="0 0 58 58" style="transform:rotate(-90deg); flex-shrink:0;"><circle cx="29" cy="29" r="24" fill="none" stroke="var(--line)" stroke-width="5"/>'
+      + '<circle cx="29" cy="29" r="24" fill="none" stroke="var(--accent)" stroke-width="5" stroke-linecap="round" stroke-dasharray="'+confCirc+'" stroke-dashoffset="'+confOffset+'"/></svg>'
+      + '<div><div style="font-family:\'IBM Plex Mono\',monospace; font-size:22px; font-weight:600; color:var(--text);">'+r.conf+'%</div>'
+      + '<div style="font-size:11px; color:var(--text4); margin-top:1px;">'+L.confidence+'</div></div></div>'
+      + '<div style="border-radius:16px; padding:16px; background:var(--surface); border:1px solid var(--line); display:flex; flex-direction:column; justify-content:center;">'
+      + '<div style="font-family:\'IBM Plex Mono\',monospace; font-size:22px; font-weight:600; color:var(--text);">'+p.freq+'</div>'
+      + '<div style="font-size:11px; color:var(--text4); margin-top:2px;">'+L.wingbeat+'</div>'
+      + '<div style="margin-top:8px; height:20px; display:flex; align-items:flex-end; gap:2px;">'
+      + '<span style="flex:1; background:#233; border-radius:1px; height:30%;"></span><span style="flex:1; background:var(--accent); border-radius:1px; height:70%;"></span><span style="flex:1; background:var(--accent); border-radius:1px; height:100%;"></span><span style="flex:1; background:var(--accent); border-radius:1px; height:60%;"></span><span style="flex:1; background:#233; border-radius:1px; height:35%;"></span><span style="flex:1; background:#233; border-radius:1px; height:20%;"></span>'
+      + '</div></div></div>'
+      // active-time cross-check
+      + '<div style="margin-top:12px; border-radius:16px; padding:14px 16px; background:'+timeBg+'; border:1px solid '+timeBorder+'; display:flex; gap:12px; align-items:flex-start;">'
+      + '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" style="flex-shrink:0; margin-top:1px;"><circle cx="12" cy="12" r="9" stroke="'+timeColor+'" stroke-width="1.8"/><path d="M12 7v5l3 2" stroke="'+timeColor+'" stroke-width="1.8" stroke-linecap="round"/></svg>'
+      + '<div><div style="font-size:13px; color:var(--text); font-weight:600;">'+timeTitle+'</div>'
+      + '<div style="font-size:12.5px; color:var(--text3); margin-top:2px; line-height:1.45;">'+timeNote+'</div></div></div>'
+      // note
+      + '<p style="margin-top:16px; font-size:13.5px; color:var(--text2); line-height:1.55;">'+p.note+'</p>'
+      // runner up
+      + '<div style="margin-top:16px;"><div style="font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--text4); font-weight:600; margin-bottom:8px;">'+L.couldAlso+'</div>'
+      + '<button onclick="App.openSpeciesId(\''+r.runner+'\')" style="width:100%; text-align:left; display:flex; align-items:center; gap:12px; border-radius:14px; padding:12px 14px; background:var(--surface2); border:1px solid var(--line); cursor:pointer;">'
+      + '<span style="font-family:\'Spectral\',serif; font-style:italic; font-size:15px; color:var(--text2); flex:1;">'+rn.name+'</span>'
+      + '<span style="font-family:\'IBM Plex Mono\',monospace; font-size:13px; color:var(--text3);">'+r.rconf+'%</span>'
+      + '<div style="width:60px; height:5px; border-radius:3px; background:var(--line2); overflow:hidden;"><div style="height:100%; width:'+r.rconf+'%; background:var(--text4); border-radius:3px;"></div></div></button></div>'
+      // actions
+      + '<div style="margin-top:22px; display:flex; gap:11px;">'
+      + '<button onclick="App.shareResult()" style="width:56px; height:54px; flex-shrink:0; border-radius:15px; border:1px solid var(--line2); background:var(--fill); display:flex; align-items:center; justify-content:center; cursor:pointer;">'
+      + '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 15V4M12 4l-4 4M12 4l4 4" stroke="var(--text2)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" stroke="var(--text2)" stroke-width="1.9" stroke-linecap="round"/></svg></button>'
+      + '<button onclick="App.saveResult()" style="flex:1; height:54px; border-radius:15px; border:none; background:linear-gradient(180deg,var(--accent),var(--accent2)); color:var(--accent-ink); font-size:15.5px; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">'
+      + '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 4h11l3 3v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" stroke="var(--accent-ink)" stroke-width="1.8"/><path d="M8 4v5h6V4M8 20v-6h8v6" stroke="var(--accent-ink)" stroke-width="1.8"/></svg>'+L.saveLog+'</button></div>'
+      + '</div></div>';
+  }
+
+  function historyScreen(L){
+    var order = ['aedes','culex','anopheles'];
+    var labels = { aedes:'Aedes', culex:'Culex', anopheles:'Anopheles' };
+    if (S.log.length === 0){
+      return '<div class="mzScreen" style="position:absolute; inset:0; padding:60px 0 96px; overflow-y:auto;">'
+        + '<div style="padding:0 22px 4px; display:flex; align-items:baseline; justify-content:space-between;">'
+        + '<h1 style="font-family:\'Spectral\',serif; font-weight:600; font-size:26px; color:var(--text);">'+L.history+'</h1>'
+        + '<span style="font-family:\'IBM Plex Mono\',monospace; font-size:12.5px; color:var(--text4);">0 '+L.logged+'</span></div>'
+        + '<div style="padding:70px 40px; text-align:center; display:flex; flex-direction:column; align-items:center;">'
+        + '<div style="animation:mzFloat 4s ease-in-out infinite;">'+mascot(84)+'</div>'
+        + '<h3 style="font-family:\'Spectral\',serif; font-size:20px; color:var(--text2); margin-top:18px;">'+L.emptyTitle+'</h3>'
+        + '<p style="font-size:13.5px; color:var(--text3); margin-top:8px; line-height:1.5;">'+L.emptyBody+'</p></div></div>';
+    }
+
+    var counts = { aedes:0, culex:0, anopheles:0 };
+    S.log.forEach(function(d){ counts[d.sp]++; });
+    var total = S.log.length;
+    var breakdown = order.filter(function(k){ return counts[k]>0; }).map(function(k){ return { label:labels[k], color:DOT[k], pct: Math.round(counts[k]/total*100)+'%' }; });
+    var peak = S.lang==='EN' ? '10PM–12AM' : '22–00';
+
+    var rangeDays = S.filterRange==='week' ? 7 : 9999;
+    var filtered = S.log.filter(function(d){ return (S.filterSpecies==='all' || d.sp===S.filterSpecies) && d.days < rangeDays; });
+
+    var pins = filtered.map(function(d,i){
+      return '<div style="position:absolute; left:'+d.left+'; top:'+d.top+'; transform:translate(-50%,-100%); animation:mzPin 0.5s cubic-bezier(.2,.8,.2,1) both; animation-delay:'+(i*0.08).toFixed(2)+'s;">'
+        + '<div style="width:22px; height:22px; border-radius:50% 50% 50% 0; transform:rotate(-45deg); background:'+DOT[d.sp]+'; box-shadow:0 4px 12px -2px '+DOT[d.sp]+'; border:2px solid var(--bg); display:flex; align-items:center; justify-content:center;"><span style="width:6px; height:6px; background:var(--bg); border-radius:50%; transform:rotate(45deg);"></span></div></div>';
+    }).join('');
+
+    var map = '<div style="margin:12px 22px 0; height:186px; border-radius:20px; overflow:hidden; position:relative; background:var(--surface3); background-image:radial-gradient(color-mix(in srgb, var(--accent) 9%, transparent) 1px, transparent 1px); background-size:22px 22px; border:1px solid var(--line);">'
+      + '<div style="position:absolute; inset:0; background:linear-gradient(160deg, color-mix(in srgb, var(--accent) 6%, transparent), transparent 55%);"></div>'
+      + '<div style="position:absolute; left:16%; top:0; bottom:0; width:34px; background:var(--fill); transform:skewX(-14deg);"></div>'
+      + '<div style="position:absolute; left:62%; top:0; bottom:0; width:20px; background:var(--fill); transform:skewX(-14deg);"></div>'
+      + '<div style="position:absolute; left:0; right:0; top:44%; height:26px; background:var(--fill); transform:skewY(-6deg);"></div>'
+      + pins
+      + '<div style="position:absolute; bottom:10px; left:12px; font-family:\'IBM Plex Mono\',monospace; font-size:10.5px; color:var(--text4); background:rgba(8,11,17,0.7); padding:4px 8px; border-radius:8px;">'+L.detectionsNear+'</div></div>';
+
+    var segs = breakdown.map(function(b){ return '<div style="width:'+b.pct+'; background:'+b.color+';"></div>'; }).join('');
+    var legend = breakdown.map(function(b){ return '<div style="display:flex; align-items:center; gap:6px;"><span style="width:9px; height:9px; border-radius:3px; background:'+b.color+';"></span><span style="font-size:12px; color:var(--text2);">'+b.label+' <span style="color:var(--text4);">'+b.pct+'</span></span></div>'; }).join('');
+    var stats = '<div style="margin:14px 22px 0; border-radius:18px; padding:16px; background:var(--surface); border:1px solid var(--line);">'
+      + '<div style="display:flex; justify-content:space-between; align-items:flex-start;">'
+      + '<div><div style="font-family:\'IBM Plex Mono\',monospace; font-size:28px; font-weight:600; color:var(--text); line-height:1;">'+total+'</div>'
+      + '<div style="font-size:11.5px; color:var(--text4); margin-top:4px;">'+L.totalDetections+'</div></div>'
+      + '<div style="text-align:right; flex-shrink:0; padding-left:14px;"><div style="font-size:13px; font-weight:600; color:var(--accent); white-space:nowrap;">'+peak+'</div>'
+      + '<div style="font-size:11px; color:var(--text4); margin-top:3px; white-space:nowrap;">'+L.mostActive+'</div></div></div>'
+      + '<div style="margin-top:14px; display:flex; height:9px; border-radius:6px; overflow:hidden; gap:2px;">'+segs+'</div>'
+      + '<div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:12px;">'+legend+'</div></div>';
+
+    var chipDef = [['all',S.lang==='EN'?'All':'Semua'],['aedes','Aedes'],['culex','Culex'],['anopheles','Anopheles']];
+    var speciesChips = chipDef.map(function(c){
+      var on = S.filterSpecies===c[0];
+      var bg = on?'color-mix(in srgb, var(--accent) 14%, transparent)':'var(--fill)';
+      var col = on?'var(--accent-soft-text)':'var(--text3)';
+      var bd = on?'color-mix(in srgb, var(--accent) 30%, transparent)':'var(--line)';
+      return '<button onclick="App.setFilterSpecies(\''+c[0]+'\')" style="flex-shrink:0; padding:8px 15px; border-radius:999px; font-size:13px; font-weight:500; cursor:pointer; border:1px solid '+bd+'; background:'+bg+'; color:'+col+';">'+c[1]+'</button>';
+    }).join('');
+    var rangeDef = [['all',S.lang==='EN'?'All time':'Semua'],['week',S.lang==='EN'?'This week':'Minggu ini']];
+    var rangeChips = rangeDef.map(function(c){
+      var on = S.filterRange===c[0];
+      var bg = on?'color-mix(in srgb, var(--accent) 14%, transparent)':'var(--fill)';
+      var col = on?'var(--accent-soft-text)':'var(--text3)';
+      var bd = on?'color-mix(in srgb, var(--accent) 30%, transparent)':'var(--line)';
+      return '<button onclick="App.setFilterRange(\''+c[0]+'\')" style="padding:7px 14px; border-radius:999px; font-size:12.5px; font-weight:500; cursor:pointer; font-family:\'IBM Plex Mono\',monospace; border:1px solid '+bd+'; background:'+bg+'; color:'+col+';">'+c[1]+'</button>';
+    }).join('');
+
+    var list = filtered.map(function(d){
+      return '<button onclick="App.openSpeciesId(\''+d.sp+'\')" style="width:100%; text-align:left; display:flex; align-items:center; gap:13px; border-radius:15px; padding:13px 14px; background:var(--surface2); border:1px solid var(--line); cursor:pointer;">'
+        + '<span style="width:11px; height:11px; border-radius:50%; flex-shrink:0; background:'+DOT[d.sp]+';"></span>'
+        + '<div style="flex:1; min-width:0;"><div style="font-family:\'Spectral\',serif; font-style:italic; font-size:15.5px; color:var(--text);">'+DB[d.sp].name+'</div>'
+        + '<div style="font-size:11.5px; color:var(--text4); margin-top:2px; display:flex; align-items:center; gap:6px;"><span>'+d.time+'</span><span style="opacity:0.4;">•</span><span>'+d.loc+'</span></div></div>'
+        + '<div style="text-align:right;"><div style="font-family:\'IBM Plex Mono\',monospace; font-size:13px; color:var(--text2);">'+d.conf+'%</div>'
+        + '<div style="font-size:10.5px; color:var(--text4); margin-top:2px;">'+d.date+'</div></div></button>';
+    }).join('');
+
+    return '<div class="mzScreen" style="position:absolute; inset:0; padding:60px 0 96px; overflow-y:auto;">'
+      + '<div style="padding:0 22px 4px; display:flex; align-items:baseline; justify-content:space-between;">'
+      + '<h1 style="font-family:\'Spectral\',serif; font-weight:600; font-size:26px; color:var(--text);">'+L.history+'</h1>'
+      + '<span style="font-family:\'IBM Plex Mono\',monospace; font-size:12.5px; color:var(--text4);">'+total+' '+L.logged+'</span></div>'
+      + map + stats
+      + '<div style="margin:16px 0 0; padding:0 22px; display:flex; gap:8px; overflow-x:auto;">'+speciesChips+'</div>'
+      + '<div style="margin:9px 0 0; padding:0 22px; display:flex; gap:8px;">'+rangeChips+'</div>'
+      + '<div style="margin-top:14px; padding:0 22px; display:flex; flex-direction:column; gap:9px;">'+list+'</div></div>';
+  }
+
+  function toggle(track, justify){
+    return '<div style="width:48px; height:28px; border-radius:999px; flex-shrink:0; padding:3px; background:'+track+'; transition:background 0.2s; display:flex; justify-content:'+justify+';"><div style="width:22px; height:22px; border-radius:50%; background:#fff;"></div></div>';
+  }
+  function settingsScreen(L){
+    var acc = 'var(--accent)', dark = S.theme!=='light';
+    var swatches = Object.keys(ACCENTS).map(function(k){
+      var ring = S.accent===k ? (dark?'#ffffff':'#0f1720') : 'transparent';
+      var check = S.accent===k ? '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M5 12.5l4 4 10-10" stroke="'+ACCENTS[k].ink+'" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/></svg>' : '';
+      return '<button onclick="App.setAccent(\''+k+'\')" style="width:46px; height:46px; border-radius:14px; cursor:pointer; background:'+ACCENTS[k].a+'; border:2px solid '+ring+'; display:flex; align-items:center; justify-content:center;">'+check+'</button>';
+    }).join('');
+
+    var darkBg = dark?acc:'transparent', darkColor = dark?'var(--accent-ink)':'var(--text3)';
+    var lightBg = !dark?acc:'transparent', lightColor = !dark?'var(--accent-ink)':'var(--text3)';
+    var enBg = S.lang==='EN'?acc:'transparent', enColor = S.lang==='EN'?'var(--accent-ink)':'var(--text3)';
+    var idBg = S.lang==='ID'?acc:'transparent', idColor = S.lang==='ID'?'var(--accent-ink)':'var(--text3)';
+
+    var morning = S.background
+      ? '<button onclick="App.openMorning()" style="margin-top:12px; width:100%; text-align:left; border-radius:16px; padding:15px 16px; background:linear-gradient(120deg,color-mix(in srgb, var(--accent) 12%, transparent),color-mix(in srgb, var(--accent) 3%, transparent)); border:1px solid color-mix(in srgb, var(--accent) 22%, transparent); cursor:pointer; display:flex; align-items:center; gap:13px;">'
+        + '<div style="animation:mzFloat 4s ease-in-out infinite;">'+mascot(44)+'</div>'
+        + '<div style="flex:1;"><div style="font-size:14px; color:var(--text); font-weight:600;">'+L.morningReady+'</div><div style="font-size:12px; color:var(--accent-soft-text); margin-top:2px;">'+L.viewSummary+'</div></div>'
+        + '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>'
+      : '';
+
+    return '<div class="mzScreen" style="position:absolute; inset:0; padding:60px 22px 96px; overflow-y:auto;">'
+      + '<h1 style="font-family:\'Spectral\',serif; font-weight:600; font-size:26px; color:var(--text); margin-bottom:18px;">'+L.settings+'</h1>'
+      // appearance card
+      + '<div style="border-radius:18px; background:var(--surface); border:1px solid var(--line); overflow:hidden; margin-bottom:12px;">'
+      + '<div style="padding:15px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px;">'
+      + '<div><div style="font-size:14.5px; color:var(--text); font-weight:600;">'+L.appearance+'</div><div style="font-size:12px; color:var(--text4); margin-top:2px;">'+L.appearanceNote+'</div></div>'
+      + '<div style="display:flex; background:var(--bg); border-radius:11px; padding:3px; border:1px solid var(--line);">'
+      + '<button onclick="App.setDark()" style="padding:7px 13px; border-radius:8px; border:none; cursor:pointer; font-size:12.5px; font-weight:600; background:'+darkBg+'; color:'+darkColor+';">'+L.dark+'</button>'
+      + '<button onclick="App.setLight()" style="padding:7px 13px; border-radius:8px; border:none; cursor:pointer; font-size:12.5px; font-weight:600; background:'+lightBg+'; color:'+lightColor+';">'+L.light+'</button></div></div>'
+      + '<div style="height:1px; background:var(--line);"></div>'
+      + '<div style="padding:15px 16px;"><div style="font-size:14.5px; color:var(--text); font-weight:600;">'+L.accentLabel+'</div>'
+      + '<div style="font-size:12px; color:var(--text4); margin-top:2px;">'+L.accentNote+'</div>'
+      + '<div style="margin-top:14px; display:flex; gap:13px;">'+swatches+'</div></div></div>'
+      // language / toggles card
+      + '<div style="border-radius:18px; background:var(--surface); border:1px solid var(--line); overflow:hidden;">'
+      + '<div style="padding:15px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px;">'
+      + '<div><div style="font-size:14.5px; color:var(--text); font-weight:600;">'+L.language+'</div><div style="font-size:12px; color:var(--text4); margin-top:2px;">'+L.langNote+'</div></div>'
+      + '<div style="display:flex; background:var(--bg); border-radius:11px; padding:3px; border:1px solid var(--line);">'
+      + '<button onclick="App.setLang(\'EN\')" style="padding:7px 14px; border-radius:8px; border:none; cursor:pointer; font-size:13px; font-weight:600; background:'+enBg+'; color:'+enColor+';">EN</button>'
+      + '<button onclick="App.setLang(\'ID\')" style="padding:7px 14px; border-radius:8px; border:none; cursor:pointer; font-size:13px; font-weight:600; background:'+idBg+'; color:'+idColor+';">ID</button></div></div>'
+      + '<div style="height:1px; background:var(--line);"></div>'
+      + '<button onclick="App.toggleVoice()" style="width:100%; text-align:left; padding:15px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; background:none; border:none; cursor:pointer;">'
+      + '<div><div style="font-size:14.5px; color:var(--text); font-weight:600;">'+L.voiceOut+'</div><div style="font-size:12px; color:var(--text4); margin-top:2px;">'+L.voiceNote+'</div></div>'
+      + toggle(S.voice?'var(--accent2)':'var(--line2)', S.voice?'flex-end':'flex-start')+'</button>'
+      + '<div style="height:1px; background:var(--line);"></div>'
+      + '<button onclick="App.toggleBackground()" style="width:100%; text-align:left; padding:15px 16px; display:flex; align-items:center; justify-content:space-between; gap:12px; background:none; border:none; cursor:pointer;">'
+      + '<div><div style="font-size:14.5px; color:var(--text); font-weight:600;">'+L.bgListen+'</div><div style="font-size:12px; color:var(--text4); margin-top:2px;">'+L.bgNote+'</div></div>'
+      + toggle(S.background?'var(--accent2)':'var(--line2)', S.background?'flex-end':'flex-start')+'</button></div>'
+      + morning
+      // notifications
+      + '<div style="font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--text4); font-weight:600; margin:22px 4px 10px;">'+L.notifications+'</div>'
+      + '<div style="display:flex; flex-direction:column; gap:9px;">'
+      + '<div style="border-radius:15px; padding:13px 15px; background:var(--surface2); border:1px solid var(--line); display:flex; gap:12px; align-items:flex-start;">'
+      + '<div style="width:34px; height:34px; border-radius:10px; background:rgba(255,138,122,0.14); flex-shrink:0; display:flex; align-items:center; justify-content:center;"><span style="color:#ff8a7a; font-weight:700; font-family:\'IBM Plex Mono\',monospace;">▲</span></div>'
+      + '<div style="flex:1;"><div style="font-size:13px; color:var(--text); font-weight:600;">'+L.notif1Title+'</div><div style="font-size:12px; color:var(--text3); margin-top:2px; line-height:1.4;">'+L.notif1Body+'</div></div></div>'
+      + '<div style="border-radius:15px; padding:13px 15px; background:var(--surface2); border:1px solid var(--line); display:flex; gap:12px; align-items:flex-start;">'
+      + '<div style="width:34px; height:34px; border-radius:10px; background:rgba(127,208,255,0.12); flex-shrink:0; display:flex; align-items:center; justify-content:center;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="13" r="7" stroke="#7fd0ff" stroke-width="1.8"/><path d="M12 10v3l2 1" stroke="#7fd0ff" stroke-width="1.8" stroke-linecap="round"/></svg></div>'
+      + '<div style="flex:1;"><div style="font-size:13px; color:var(--text); font-weight:600;">'+L.notif2Title+'</div><div style="font-size:12px; color:var(--text3); margin-top:2px; line-height:1.4;">'+L.notif2Body+'</div></div></div></div>'
+      + '<button onclick="App.previewNotif()" style="margin-top:9px; width:100%; padding:11px; border-radius:13px; border:1px dashed color-mix(in srgb, var(--accent) 35%, transparent); background:transparent; color:var(--accent); font-size:13px; font-weight:600; cursor:pointer;">'+L.previewNotif+'</button>'
+      // data
+      + '<div style="font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--text4); font-weight:600; margin:22px 4px 10px;">'+L.data+'</div>'
+      + '<button onclick="App.exportData()" style="width:100%; text-align:left; border-radius:15px; padding:15px 16px; background:var(--surface); border:1px solid var(--line); cursor:pointer; display:flex; align-items:center; justify-content:space-between;">'
+      + '<div style="font-size:14px; color:var(--text); font-weight:600;">'+L.exportCsv+'</div>'
+      + '<svg width="20" height="20" viewBox="0 0 24 24" fill="none"><path d="M12 4v11M12 15l-4-4M12 15l4-4" stroke="var(--text2)" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/><path d="M5 18h14" stroke="var(--text2)" stroke-width="1.9" stroke-linecap="round"/></svg></button>'
+      + '<button onclick="App.replayOnboard()" style="margin-top:9px; width:100%; text-align:left; border-radius:15px; padding:15px 16px; background:var(--surface); border:1px solid var(--line); cursor:pointer; display:flex; align-items:center; justify-content:space-between;">'
+      + '<div style="font-size:14px; color:var(--text); font-weight:600;">'+L.replayIntro+'</div>'
+      + '<svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M9 6l6 6-6 6" stroke="var(--text2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>'
+      + '<div style="text-align:center; margin-top:22px; font-family:\'IBM Plex Mono\',monospace; font-size:11px; color:var(--faint);">MozzID · on-device · v1.0</div></div>';
+  }
+
+  function bottomNav(L){
+    var recActive = S.tab==='record';
+    var histColor = (S.tab==='history' && S.phase!=='result') ? 'var(--accent)' : 'var(--text4)';
+    var setColor = (S.tab==='settings' && S.phase!=='result') ? 'var(--accent)' : 'var(--text4)';
+    var recColor = recActive ? 'var(--accent)' : 'var(--text4)';
+    var recBg = recActive ? 'color-mix(in srgb, var(--accent) 15%, transparent)' : 'transparent';
+    var recBorder = recActive ? 'var(--accent)' : 'var(--text4)';
+    var recDot = recActive ? 'var(--accent)' : 'var(--text4)';
+    return '<div style="position:absolute; bottom:0; left:0; right:0; height:84px; z-index:35; background:linear-gradient(180deg,transparent,var(--bg) 40%); backdrop-filter:blur(14px); border-top:1px solid var(--line); display:flex; align-items:flex-start; padding:12px 34px 0;">'
+      + '<button onclick="App.setTab(\'history\')" style="flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; background:none; border:none; cursor:pointer;">'
+      + '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="'+histColor+'" stroke-width="1.8"/><path d="M12 7.5V12l3 2" stroke="'+histColor+'" stroke-width="1.8" stroke-linecap="round"/></svg>'
+      + '<span style="font-size:10.5px; color:'+histColor+'; font-weight:500;">'+L.history+'</span></button>'
+      + '<button onclick="App.setTab(\'record\')" style="flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; background:none; border:none; cursor:pointer;">'
+      + '<div style="width:30px; height:30px; border-radius:50%; background:'+recBg+'; display:flex; align-items:center; justify-content:center; border:2px solid '+recBorder+';"><span style="width:11px; height:11px; border-radius:50%; background:'+recDot+';"></span></div>'
+      + '<span style="font-size:10.5px; color:'+recColor+'; font-weight:500;">'+L.record+'</span></button>'
+      + '<button onclick="App.setTab(\'settings\')" style="flex:1; display:flex; flex-direction:column; align-items:center; gap:5px; background:none; border:none; cursor:pointer;">'
+      + '<svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke="'+setColor+'" stroke-width="1.8" stroke-linecap="round"/><circle cx="9" cy="7" r="2.4" fill="var(--bg)" stroke="'+setColor+'" stroke-width="1.8"/><circle cx="15" cy="12" r="2.4" fill="var(--bg)" stroke="'+setColor+'" stroke-width="1.8"/><circle cx="9" cy="17" r="2.4" fill="var(--bg)" stroke="'+setColor+'" stroke-width="1.8"/></svg>'
+      + '<span style="font-size:10.5px; color:'+setColor+'; font-weight:500;">'+L.settings+'</span></button>'
+      + '<div style="position:absolute; bottom:8px; left:50%; transform:translateX(-50%); width:130px; height:5px; border-radius:3px; background:var(--line2);"></div></div>';
+  }
+
+  function speciesCard(L){
+    if (!S.speciesId) return '';
+    var d = DB[S.speciesId], sev = SEV[d.sev];
+    var tips = d.tips.map(function(t){ return '<div style="display:flex; gap:11px; align-items:flex-start;"><span style="width:6px; height:6px; border-radius:50%; background:var(--accent); margin-top:7px; flex-shrink:0;"></span><span style="font-size:13.5px; color:var(--text2); line-height:1.5;">'+t+'</span></div>'; }).join('');
+    return '<div style="position:absolute; inset:0; z-index:50; background:rgba(4,6,10,0.6); backdrop-filter:blur(6px);" onclick="App.closeSpecies()">'
+      + '<div onclick="App.noop(event)" style="position:absolute; bottom:0; left:0; right:0; max-height:88%; overflow-y:auto; background:var(--surface3); border-radius:28px 28px 42px 42px; border:1px solid var(--line2); animation:mzSlide 0.4s cubic-bezier(.2,.8,.2,1); padding-bottom:30px;">'
+      + '<div style="position:sticky; top:0; padding-top:12px; display:flex; justify-content:center; background:var(--surface3);"><div style="width:44px; height:5px; border-radius:3px; background:var(--line2);"></div></div>'
+      + '<div style="padding:16px 22px 0;">'
+      + '<div style="height:150px; border-radius:20px; overflow:hidden; position:relative; background:repeating-linear-gradient(135deg,var(--surface2),var(--surface2) 9px,var(--surface3) 9px,var(--surface3) 18px); border:1px solid var(--line); display:flex; align-items:center; justify-content:center;">'
+      + '<span style="font-family:\'IBM Plex Mono\',monospace; font-size:11px; color:var(--faint);">'+d.name+' — photo</span></div>'
+      + '<h2 style="font-family:\'Spectral\',serif; font-style:italic; font-weight:600; font-size:27px; color:var(--text); margin-top:16px;">'+d.name+'</h2>'
+      + '<div style="font-size:13.5px; color:var(--text3); margin-top:2px;">'+d.common+'</div>'
+      + '<div style="margin-top:18px; display:grid; grid-template-columns:1fr 1fr; gap:10px;">'
+      + '<div style="border-radius:14px; padding:13px; background:var(--surface); border:1px solid var(--line);"><div style="font-size:10.5px; letter-spacing:0.5px; text-transform:uppercase; color:var(--text4); font-weight:600;">'+L.wingbeat+'</div><div style="font-family:\'IBM Plex Mono\',monospace; font-size:17px; color:var(--accent); margin-top:4px;">'+d.freqRange+'</div></div>'
+      + '<div style="border-radius:14px; padding:13px; background:var(--surface); border:1px solid var(--line);"><div style="font-size:10.5px; letter-spacing:0.5px; text-transform:uppercase; color:var(--text4); font-weight:600;">'+L.activeHours+'</div><div style="font-size:14px; color:var(--text); margin-top:5px; font-weight:600;">'+d.active+'</div></div></div>'
+      + '<div style="margin-top:10px; border-radius:14px; padding:13px 15px; background:'+sev.bg+'; border:1px solid '+sev.border+'; display:flex; align-items:center; gap:11px;">'
+      + '<span style="font-family:\'IBM Plex Mono\',monospace; font-weight:700; font-size:16px; color:'+sev.color+';">'+sev.glyph+'</span>'
+      + '<div><div style="font-size:10.5px; letter-spacing:0.5px; text-transform:uppercase; color:'+sev.color+'; font-weight:700;">'+sev.label+'</div><div style="font-size:14px; color:var(--text); font-weight:600; margin-top:1px;">'+d.diseases+'</div></div></div>'
+      + '<div style="font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--text4); font-weight:600; margin:20px 0 9px;">'+L.prevention+'</div>'
+      + '<div style="display:flex; flex-direction:column; gap:8px;">'+tips+'</div>'
+      + '<button onclick="App.closeSpecies()" style="margin-top:22px; width:100%; height:50px; border-radius:14px; border:1px solid var(--line2); background:var(--fill); color:var(--text2); font-size:15px; font-weight:600; cursor:pointer;">'+L.close+'</button>'
+      + '</div></div></div>';
+  }
+
+  function morningOverlay(L){
+    if (!S.morningOpen) return '';
+    var th = [20,0,55,0,0,80,40,0,0,30,0,0];
+    var tc = ['#ff8a7a','','#7fd0ff','','','#ff8a7a','#7fd0ff','','','#ffcf6b','',''];
+    var timeline = th.map(function(h,i){
+      var color = tc[i] || 'rgba(255,255,255,0.05)';
+      return '<div style="flex:1; display:flex; flex-direction:column; justify-content:flex-end; height:100%;"><div style="width:100%; border-radius:3px 3px 0 0; background:'+color+'; height:'+((h||4))+'%;"></div></div>';
+    }).join('');
+    return '<div style="position:absolute; inset:0; z-index:52; background:linear-gradient(180deg,var(--surface3),var(--bg)); animation:mzFade 0.4s both; overflow-y:auto; padding:60px 24px 40px;">'
+      + '<button onclick="App.closeMorning()" style="position:absolute; top:58px; right:22px; width:38px; height:38px; border-radius:12px; border:1px solid var(--line2); background:var(--fill); color:var(--text2); font-size:18px; cursor:pointer;">✕</button>'
+      + '<div style="text-align:center; padding-top:8px;"><div style="display:inline-block; animation:mzFloat 4s ease-in-out infinite;">'+mascot(112)+'</div>'
+      + '<div style="font-family:\'IBM Plex Mono\',monospace; font-size:12px; color:var(--accent); margin-top:14px; letter-spacing:1px;">'+L.goodMorning+'</div>'
+      + '<h1 style="font-family:\'Spectral\',serif; font-weight:600; font-size:25px; color:var(--text); margin-top:8px; line-height:1.3; text-wrap:balance;">'+L.morningHead+'</h1></div>'
+      + '<div style="margin-top:24px; display:flex; gap:11px;">'
+      + '<div style="flex:1; border-radius:16px; padding:15px; background:var(--surface); border:1px solid var(--line); text-align:center;"><div style="font-family:\'IBM Plex Mono\',monospace; font-size:26px; color:#ff8a7a; font-weight:600;">2</div><div style="font-size:11.5px; color:var(--text3); margin-top:4px; font-style:italic; font-family:Spectral,serif;">Aedes</div></div>'
+      + '<div style="flex:1; border-radius:16px; padding:15px; background:var(--surface); border:1px solid var(--line); text-align:center;"><div style="font-family:\'IBM Plex Mono\',monospace; font-size:26px; color:#7fd0ff; font-weight:600;">1</div><div style="font-size:11.5px; color:var(--text3); margin-top:4px; font-style:italic; font-family:Spectral,serif;">Culex</div></div></div>'
+      + '<div style="margin-top:14px; border-radius:16px; padding:16px; background:var(--surface); border:1px solid var(--line);">'
+      + '<div style="font-size:11px; letter-spacing:1px; text-transform:uppercase; color:var(--text4); font-weight:600; margin-bottom:14px;">'+L.overnightTimeline+'</div>'
+      + '<div style="display:flex; align-items:flex-end; gap:5px; height:60px;">'+timeline+'</div>'
+      + '<div style="display:flex; justify-content:space-between; margin-top:8px; font-family:\'IBM Plex Mono\',monospace; font-size:10px; color:var(--text4);"><span>10PM</span><span>1AM</span><span>4AM</span><span>6AM</span></div></div>'
+      + '<button onclick="App.closeMorning()" style="margin-top:20px; width:100%; height:52px; border-radius:15px; border:none; background:linear-gradient(180deg,var(--accent),var(--accent2)); color:var(--accent-ink); font-size:15px; font-weight:700; cursor:pointer;">'+L.gotIt+'</button></div>';
+  }
+
+  function onboardingOverlay(L){
+    if (S.onboarded) return '';
+    var obData = [
+      { title: S.lang==='EN'?'Catch a good sample':'Tangkap sampel bagus', body: S.lang==='EN'?'Get close to the buzz, hold steady, and keep background noise low for the clearest wingbeat.':'Dekati dengungan, tahan stabil, dan jaga bising rendah untuk sayap paling jernih.', cta:S.lang==='EN'?'Next':'Lanjut', showPerms:false },
+      { title: S.lang==='EN'?'Works fully offline':'Sepenuhnya offline', body: S.lang==='EN'?'The species model runs entirely on your phone. No signal, no data — your detections stay private.':'Model spesies berjalan di ponsel Anda. Tanpa sinyal, tanpa data — deteksi tetap privat.', cta:S.lang==='EN'?'Next':'Lanjut', showPerms:false },
+      { title: S.lang==='EN'?'Two quick permissions':'Dua izin singkat', body: S.lang==='EN'?'MozzID needs your mic to hear the wingbeat and location to map where you found it.':'MozzID butuh mik untuk mendengar sayap dan lokasi untuk memetakan temuan.', cta:S.lang==='EN'?'Start listening':'Mulai', showPerms:true },
+    ];
+    var ob = obData[S.obStep];
+    var perms = ob.showPerms
+      ? '<div style="margin-top:22px; display:flex; flex-direction:column; gap:10px; width:100%; max-width:280px;">'
+        + '<div style="display:flex; align-items:center; gap:12px; padding:13px 15px; border-radius:14px; background:var(--surface); border:1px solid color-mix(in srgb, var(--accent) 20%, transparent);">'
+        + '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="9" y="3" width="6" height="12" rx="3" stroke="var(--accent)" stroke-width="1.8"/><path d="M6 11a6 6 0 0 0 12 0M12 17v4" stroke="var(--accent)" stroke-width="1.8" stroke-linecap="round"/></svg>'
+        + '<div style="flex:1; text-align:left;"><div style="font-size:13.5px; color:var(--text); font-weight:600;">'+L.micTitle+'</div><div style="font-size:11.5px; color:var(--text4);">'+L.micNote+'</div></div>'
+        + '<span style="font-size:12px; color:var(--accent); font-weight:600;">'+L.allow+'</span></div>'
+        + '<div style="display:flex; align-items:center; gap:12px; padding:13px 15px; border-radius:14px; background:var(--surface); border:1px solid color-mix(in srgb, var(--accent) 20%, transparent);">'
+        + '<svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12z" stroke="var(--accent)" stroke-width="1.8"/><circle cx="12" cy="9" r="2.5" stroke="var(--accent)" stroke-width="1.8"/></svg>'
+        + '<div style="flex:1; text-align:left;"><div style="font-size:13.5px; color:var(--text); font-weight:600;">'+L.locTitle+'</div><div style="font-size:11.5px; color:var(--text4);">'+L.locNote+'</div></div>'
+        + '<span style="font-size:12px; color:var(--accent); font-weight:600;">'+L.allow+'</span></div></div>'
+      : '';
+    var dots = [0,1,2].map(function(i){
+      var w = i===S.obStep?'22px':'7px';
+      var color = i===S.obStep?'var(--accent)':'var(--line2)';
+      return '<span style="height:7px; border-radius:4px; transition:all 0.3s; width:'+w+'; background:'+color+';"></span>';
+    }).join('');
+    return '<div style="position:absolute; inset:0; z-index:60; background:radial-gradient(900px 500px at 50% 0%, var(--surface3), var(--bg) 60%); animation:mzFade 0.3s both; display:flex; flex-direction:column; padding:56px 30px 30px;">'
+      + '<div style="display:flex; justify-content:flex-end; flex-shrink:0;"><button onclick="App.finishOnboard()" style="background:none; border:none; color:var(--text4); font-size:14px; cursor:pointer;">'+L.skip+'</button></div>'
+      + '<div style="flex:1; min-height:0; overflow-y:auto; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:10px 0;">'
+      + '<div style="animation:mzFloat 4s ease-in-out infinite; margin-bottom:8px;">'+mascot(112)+'</div>'
+      + '<h1 style="font-family:\'Spectral\',serif; font-weight:600; font-size:27px; color:var(--text); margin-top:24px; line-height:1.25; text-wrap:balance;">'+ob.title+'</h1>'
+      + '<p style="font-size:15px; color:var(--text3); margin-top:12px; line-height:1.55; max-width:280px;">'+ob.body+'</p>'+perms+'</div>'
+      + '<div style="display:flex; align-items:center; justify-content:center; gap:8px; margin-bottom:22px;">'+dots+'</div>'
+      + '<button onclick="App.nextOnboard()" style="width:100%; height:54px; border-radius:16px; border:none; background:linear-gradient(180deg,var(--accent),var(--accent2)); color:var(--accent-ink); font-size:16px; font-weight:700; cursor:pointer;">'+ob.cta+'</button></div>';
+  }
+
+  function notifBanner(L){
+    if (!S.showNotif) return '';
+    return '<div style="position:absolute; top:56px; left:12px; right:12px; z-index:70; animation:mzPop 0.35s cubic-bezier(.2,.8,.2,1) both;">'
+      + '<div style="border-radius:20px; padding:14px 15px; background:rgba(18,24,34,0.92); backdrop-filter:blur(20px); border:1px solid var(--line2); box-shadow:0 18px 50px -12px rgba(0,0,0,0.7); display:flex; gap:12px; align-items:flex-start;">'
+      + '<div style="width:38px; height:38px; border-radius:11px; background:linear-gradient(135deg,var(--accent),var(--accent2)); flex-shrink:0; display:flex; align-items:center; justify-content:center;"><svg width="20" height="20" viewBox="0 0 24 24" fill="none"><rect x="9" y="4" width="6" height="10" rx="3" fill="var(--accent-ink)"/><path d="M6 11a6 6 0 0 0 12 0" stroke="var(--accent-ink)" stroke-width="1.9" stroke-linecap="round"/></svg></div>'
+      + '<div style="flex:1;"><div style="display:flex; justify-content:space-between; align-items:center;"><span style="font-size:11px; font-weight:700; color:var(--accent-soft-text); letter-spacing:0.3px;">MOZZID</span><span style="font-size:10.5px; color:var(--text4); font-family:\'IBM Plex Mono\',monospace;">now</span></div>'
+      + '<div style="font-size:13.5px; color:var(--text); font-weight:600; margin-top:3px;">'+L.notif1Title+'</div>'
+      + '<div style="font-size:12.5px; color:var(--text2); margin-top:2px; line-height:1.4;">'+L.notif1Body+'</div></div></div></div>';
+  }
+  function toastEl(){
+    if (!S.toast) return '';
+    return '<div style="position:absolute; bottom:100px; left:50%; transform:translateX(-50%); z-index:65; animation:mzPop 0.3s both;">'
+      + '<div style="padding:12px 18px; border-radius:14px; background:rgba(18,24,34,0.95); backdrop-filter:blur(16px); border:1px solid color-mix(in srgb, var(--accent) 25%, transparent); box-shadow:0 14px 40px -10px rgba(0,0,0,0.7); display:flex; align-items:center; gap:9px; white-space:nowrap;">'
+      + '<span style="width:8px; height:8px; border-radius:50%; background:var(--accent); box-shadow:0 0 8px var(--accent);"></span>'
+      + '<span style="font-size:13.5px; color:var(--text); font-weight:500;">'+S.toast+'</span></div></div>';
+  }
+
+  // ---------- render ----------
+  function render(){
+    var L = STR[S.lang];
+    var tv = themeVars();
+    var body = '';
+    if (S.tab==='record' && S.phase==='result') body = resultScreen(L);
+    else if (S.tab==='record') body = recordScreen(L);
+    else if (S.tab==='history') body = historyScreen(L);
+    else if (S.tab==='settings') body = settingsScreen(L);
+
+    var html = statusBar() + body + bottomNav(L)
+      + speciesCard(L) + morningOverlay(L) + onboardingOverlay(L)
+      + notifBanner(L) + toastEl();
+
+    var screen = document.getElementById('screen');
+    screen.setAttribute('style', 'position:relative; width:100%; height:100%; border-radius:42px; overflow:hidden; background:var(--bg); transition:background .35s; '+tv.vars);
+    screen.innerHTML = html;
+    document.querySelector('meta[name=theme-color]').setAttribute('content', tv.dark ? '#080b11' : '#e7ebf1');
+  }
+
+  // ---------- boot ----------
+  render();
+  if (S.onboarded) scheduleNotif(1400, 6200);
+})();
+</script>
+</body>
+</html>

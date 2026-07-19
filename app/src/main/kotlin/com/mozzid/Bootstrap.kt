@@ -5,6 +5,7 @@ import com.mozzid.data.classifier.MockSpeciesClassifier
 import com.mozzid.data.local.DemoSeeder
 import com.mozzid.data.local.MozzDatabase
 import com.mozzid.data.local.RoomDetectionRepository
+import com.mozzid.data.local.RoomSettingsRepository
 import com.mozzid.data.audio.MicAudioRecorder
 import com.mozzid.data.location.FusedLocationService
 import com.mozzid.data.permission.PermissionBridge
@@ -14,6 +15,7 @@ import com.mozzid.domain.classifier.SpeciesClassifier
 import com.mozzid.domain.repository.AudioRecorderService
 import com.mozzid.domain.repository.DetectionRepository
 import com.mozzid.domain.repository.LocationService
+import com.mozzid.domain.repository.SettingsRepository
 import com.mozzid.domain.repository.SpeciesRepository
 import com.mozzid.domain.sync.SyncService
 
@@ -27,6 +29,7 @@ class Bootstrap private constructor(
     val database: MozzDatabase,
     val detectionRepository: DetectionRepository,
     val speciesRepository: SpeciesRepository,
+    val settingsRepository: SettingsRepository,
     val classifier: SpeciesClassifier,
     val audioRecorder: AudioRecorderService,
     val location: LocationService,
@@ -50,6 +53,7 @@ class Bootstrap private constructor(
                 database = db,
                 detectionRepository = RoomDetectionRepository(db.detectionDao()),
                 speciesRepository = species,
+                settingsRepository = RoomSettingsRepository(db.settingsDao()),
                 classifier = classifier,
                 audioRecorder = MicAudioRecorder(app, permissions),
                 location = FusedLocationService(app, permissions),

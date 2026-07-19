@@ -1,5 +1,6 @@
 package com.mozzid.domain.repository
 
+import com.mozzid.domain.model.AppSettings
 import com.mozzid.domain.model.Detection
 import com.mozzid.domain.model.Species
 import kotlinx.coroutines.flow.Flow
@@ -28,4 +29,18 @@ interface SpeciesRepository {
 
     /** The species ids the classifier can currently emit, in catalogue order. */
     val classifiableIds: List<String>
+}
+
+/**
+ * User preferences — language, theme, toggles, onboarding flag — stored as
+ * key/value rows and read as one [AppSettings] value.
+ */
+interface SettingsRepository {
+    /** Live so a language, brightness, or accent change recolours/relabels at once. */
+    fun watch(): Flow<AppSettings>
+
+    suspend fun current(): AppSettings
+
+    /** Read-modify-write of the whole value; only changed keys are persisted. */
+    suspend fun update(transform: (AppSettings) -> AppSettings)
 }

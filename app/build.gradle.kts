@@ -39,6 +39,16 @@ android {
     buildFeatures {
         compose = true
     }
+
+    bundle {
+        language {
+            // The in-app language switch overrides the system locale, so every
+            // language must ship in the base install. Splitting by language would
+            // let Play omit the one the user later picks, and an offline-first app
+            // has no way to fetch it back.
+            enableSplit = false
+        }
+    }
     sourceSets["main"].java.srcDirs("src/main/kotlin")
     sourceSets["test"].java.srcDirs("src/test/kotlin")
 }

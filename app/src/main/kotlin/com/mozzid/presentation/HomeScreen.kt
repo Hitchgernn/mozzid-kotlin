@@ -1,6 +1,7 @@
 package com.mozzid.presentation
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,20 +22,28 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mozzid.Bootstrap
+import com.mozzid.R
+import com.mozzid.domain.model.AppLanguage
+import com.mozzid.domain.model.AppSettings
 import com.mozzid.domain.model.Detection
+import com.mozzid.domain.model.ThemeBrightness
 import com.mozzid.presentation.record.RecordPhase
 import com.mozzid.presentation.record.RecordViewModel
+import com.mozzid.presentation.theme.AppAccent
 import com.mozzid.presentation.theme.Dimens
 import com.mozzid.presentation.theme.MozzTheme
 import com.mozzid.presentation.theme.dotColor
+import kotlinx.coroutines.launch
 import com.mozzid.presentation.theme.MozzType
 
 /**
@@ -65,7 +74,7 @@ fun HomeScreen(boot: Bootstrap) {
             .padding(Dimens.pagePad),
     ) {
         Text(
-            "MozzID",
+            stringResource(R.string.app_name),
             style = androidx.compose.ui.text.TextStyle(
                 fontFamily = MozzType.Serif,
                 fontWeight = FontWeight.SemiBold,
@@ -74,13 +83,19 @@ fun HomeScreen(boot: Bootstrap) {
             ),
         )
         Text(
-            "Identify a mosquito by its wingbeat",
+            stringResource(R.string.heard_buzz),
             style = androidx.compose.ui.text.TextStyle(
                 fontFamily = MozzType.Sans, fontSize = 14.sp, color = c.text3,
             ),
         )
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(12.dp))
+
+        // Temporary switches so the live language and theme swap can be verified
+        // before the real Settings screen lands.
+        SettingsProbe(boot)
+
+        Spacer(Modifier.height(16.dp))
 
         // Record button (press and hold ~4s).
         Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
@@ -138,7 +153,7 @@ fun HomeScreen(boot: Bootstrap) {
         }
 
         Text(
-            "History · ${log.size}",
+            "${stringResource(R.string.history)} · ${log.size}",
             style = androidx.compose.ui.text.TextStyle(
                 fontFamily = MozzType.Mono, fontSize = 12.sp, color = c.text4,
             ),
@@ -148,6 +163,87 @@ fun HomeScreen(boot: Bootstrap) {
             items(log) { d -> LogRow(d, boot) }
         }
     }
+}
+
+/**
+ * Throwaway control strip: flips language, brightness and accent so the live
+ * settings wiring is verifiable today. The real Settings screen replaces this.
+ */
+@Composable
+private fun SettingsProbe(boot: Bootstrap) {
+    val c = MozzTheme.colors
+    val scope = rememberCoroutineScope()
+    val settings by boot.settingsRepository.watch().collectAsState(initial = AppSettings())
+
+    fun edit(transform: (AppSettings) -> AppSettings) {
+        scope.launch { boot.settingsRepository.update(transform) }
+    }
+
+    Row(horizontalArrangement = Arrangement.spacedBy(Dimens.gap)) {
+        ProbeChip(
+            label = settings.language.tag.uppercase(),
+            onClick = {
+                edit {
+                    it.copy(
+                        language = if (it.language == AppLanguage.ENGLISH) {
+                            AppLanguage.INDONESIAN
+                        } else {
+                            AppLanguage.ENGLISH
+                        },
+                    )
+                }
+            },
+        )
+        ProbeChip(
+            label = stringResource(
+                if (settings.brightness == ThemeBrightness.DARK) R.string.dark else R.string.light,
+            ),
+            onClick = {
+                edit {
+                    it.copy(
+                        brightness = if (it.brightness == ThemeBrightness.DARK) {
+                            ThemeBrightness.LIGHT
+                        } else {
+                            ThemeBrightness.DARK
+                        },
+                    )
+                }
+            },
+        )
+        ProbeChip(
+            label = stringResource(R.string.accent_label),
+            onClick = {
+                edit {
+                    val accents = AppAccent.entries
+                    val next = accents[(AppAccent.fromName(it.accentId).ordinal + 1) % accents.size]
+                    it.copy(accentId = next.name)
+                }
+            },
+        )
+    }
+    Spacer(Modifier.height(4.dp))
+    Text(
+        stringResource(R.string.offline),
+        style = androidx.compose.ui.text.TextStyle(
+            fontFamily = MozzType.Mono, fontSize = 11.sp, color = c.text4,
+        ),
+    )
+}
+
+@Composable
+private fun ProbeChip(label: String, onClick: () -> Unit) {
+    val c = MozzTheme.colors
+    Text(
+        label,
+        modifier = Modifier
+            .clip(RoundedCornerShape(Dimens.chipRadius))
+            .background(c.fill)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        style = androidx.compose.ui.text.TextStyle(
+            fontFamily = MozzType.Mono, fontSize = 11.sp, color = c.accentSoftText,
+        ),
+    )
 }
 
 @Composable

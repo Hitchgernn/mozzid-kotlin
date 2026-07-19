@@ -8,11 +8,15 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import com.mozzid.data.permission.PermissionBridge
+import com.mozzid.domain.model.AppSettings
+import com.mozzid.domain.model.ThemeBrightness
 import com.mozzid.presentation.HomeScreen
+import com.mozzid.presentation.ProvideAppLanguage
 import com.mozzid.presentation.theme.AppAccent
 import com.mozzid.presentation.theme.MozzTheme
 
@@ -21,14 +25,25 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            MozzTheme(accent = AppAccent.TEAL) {
-                // Build the graph once, off the UI construction path.
-                val boot by produceState<Bootstrap?>(initialValue = null) {
-                    value = Bootstrap.create(applicationContext)
-                }
-                boot?.let {
-                    BindPermissions(it.permissions)
-                    HomeScreen(it)
+            // Build the graph once, off the UI construction path.
+            val boot by produceState<Bootstrap?>(initialValue = null) {
+                value = Bootstrap.create(applicationContext)
+            }
+
+            boot?.let { app ->
+                // Persisted settings drive language, brightness and accent, so
+                // changing any of them relabels or recolours the whole tree live.
+                val settings by app.settingsRepository.watch()
+                    .collectAsState(initial = AppSettings())
+
+                ProvideAppLanguage(settings.language) {
+                    MozzTheme(
+                        dark = settings.brightness == ThemeBrightness.DARK,
+                        accent = AppAccent.fromName(settings.accentId),
+                    ) {
+                        BindPermissions(app.permissions)
+                        HomeScreen(app)
+                    }
                 }
             }
         }

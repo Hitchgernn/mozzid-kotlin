@@ -15,9 +15,9 @@ colours, full English and Indonesian localisation.
 > model can drop in later without touching a single screen. See
 > [The two seams](#the-two-seams).
 
-For a plain-language explanation of how the app is put together, see
-[`ARCHITECTURE.md`](ARCHITECTURE.md). For exact design tokens, models, and
-porting detail, see [`PORTING_SPEC.md`](PORTING_SPEC.md).
+For the layer topology, seam contracts, DB schema, and capture pipeline, see
+[`ARCHITECTURE.md`](ARCHITECTURE.md). For exact design tokens, screen geometry,
+and porting detail, see [`PORTING_SPEC.md`](PORTING_SPEC.md).
 
 ---
 
@@ -26,21 +26,22 @@ porting detail, see [`PORTING_SPEC.md`](PORTING_SPEC.md).
 This is a native Kotlin port of a working Flutter app, which is kept in
 `reference/` for line-level detail and is not modified.
 
-**Working:** three-layer architecture with a verified-pure domain layer, both
-seams, real microphone capture, real GPS, the full record-analyze-result-save
-flow, Room persistence with demo seed data, the complete design token system,
-all 85 strings in both locales with a live in-app language switch, and eight
-passing unit tests.
+**Working, and verified on an emulator:** three-layer architecture with a
+verified-pure domain layer, both seams, real microphone capture, real GPS, the
+full record-analyze-result-save flow, Room persistence with demo seed data, all
+designed screens (onboarding, record, result, history with the offline map,
+species sheet, settings, morning summary), the complete design token system with
+live accent and brightness switching, every string in both locales with a live
+in-app language switch, and 14 passing unit tests.
 
-**Not built yet:** the real classification model, optional Firebase sync, and
-most of the designed screens. `HomeScreen` is currently a bare screen that drives
-the real flow end to end; onboarding, the full record screen, history with the
-map, the species sheet, and settings are the next major piece of work.
+**Not built yet:** the real classification model, optional Firebase sync,
+background/passive listening (the toggle and morning summary exist, but no
+background service runs), voice output, and CSV export — the export action
+currently only confirms with a toast.
 
-**Not yet run on hardware.** The project builds and packages a working APK, but
-has not been installed on a physical device or emulator. The microphone, GPS, and
-locale override are the parts most likely to behave differently on real hardware,
-so treat them as written but unproven.
+**Known issue:** recorded WAVs overrun the 4s capture window (~5.4s of PCM)
+because the writer loop drains after `stop()`. Harmless against the mock, which
+ignores audio content, but must be fixed before TFLite work.
 
 ---
 
@@ -132,10 +133,16 @@ app/src/main/kotlin/com/mozzid/
 │   ├── species/              SpeciesCatalog (three species, static)
 │   └── sync/                 NoopSyncService (the default binding)
 └── presentation/             Compose + ViewModels
-    ├── theme/                MozzColors, AppAccent, MozzType, Dimens
-    ├── record/               RecordViewModel state machine
+    ├── theme/                MozzColors, AppAccent, MozzType, Dimens, Motion
+    ├── components/           Mascot, icon set, cards, chips, toggles
+    ├── record/               RecordViewModel state machine + record/result screens
+    ├── history/              Log, offline map, stats, filters
+    ├── settings/             Appearance, language, toggles, data actions
+    ├── species/              Species reference sheet
+    ├── onboarding/           Three-page intro + permission primers
+    ├── morning/              Overnight summary
     ├── AppLocale.kt          Live locale override
-    └── HomeScreen.kt         Skeleton screen driving the real flow
+    └── MozzApp.kt            Tab shell, overlays, toast
 ```
 
 **Dependency injection** is a single `Bootstrap` object, currently assembled in
@@ -208,9 +215,10 @@ export JAVA_HOME=/path/to/jdk17
 ./gradlew :app:testDebugUnitTest
 ```
 
-Eight tests cover the pure statistics and filtering logic in `domain/stats/`.
-That logic takes `now` as a parameter rather than reading the clock, which is
-what makes date-range filtering deterministically testable.
+14 tests cover the pure statistics, filtering, and active-window logic in
+`domain/`. That logic takes `now` (or the hour) as a parameter rather than
+reading the clock, which is what makes date-range filtering and the active-hours
+cross-check deterministically testable.
 
 ---
 
@@ -238,10 +246,10 @@ what makes date-range filtering deterministically testable.
 
 ## Localisation
 
-All 85 strings live in `res/values/strings.xml` (English) and
-`res/values-in/strings.xml` (Indonesian — `in` is Android's legacy qualifier for
-`id`). Both are generated from the reference `.arb` files so the two locales
-cannot drift apart.
+All 90 strings plus one `<plurals>` live in `res/values/strings.xml` (English)
+and `res/values-in/strings.xml` (Indonesian — `in` is Android's legacy qualifier
+for `id`), with identical key sets on both sides. The bulk were generated from
+the reference `.arb` files so the two locales cannot drift apart.
 
 The in-app language switch overrides the system locale and applies immediately
 without restarting, by overriding the Context and Configuration the composition

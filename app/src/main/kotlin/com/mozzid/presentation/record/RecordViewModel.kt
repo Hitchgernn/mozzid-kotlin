@@ -7,6 +7,7 @@ import com.mozzid.domain.classifier.SpeciesClassifier
 import com.mozzid.domain.model.Detection
 import com.mozzid.domain.repository.AudioRecorderService
 import com.mozzid.domain.repository.DetectionRepository
+import com.mozzid.domain.repository.GeoFix
 import com.mozzid.domain.repository.LocationService
 import com.mozzid.domain.sync.SyncService
 import kotlinx.coroutines.Job
@@ -34,6 +35,12 @@ class RecordViewModel(
     val state: StateFlow<RecordState> = _state.asStateFlow()
 
     private var listenJob: Job? = null
+
+    /** GPS fix resolved during the result screen, attached on save. */
+    private var pendingFix: GeoFix? = null
+
+    /** When the clip was actually captured — not when the user got round to saving. */
+    private var capturedAt: Long = 0L
 
     companion object {
         const val CAPTURE_MILLIS = 4000L
@@ -82,28 +89,52 @@ class RecordViewModel(
         _state.value = _state.value.copy(phase = RecordPhase.ANALYZING)
 
         val result = classifier.classify(AudioSample(filePath = path, durationMillis = duration))
+        capturedAt = System.currentTimeMillis()
         _state.value = _state.value.copy(phase = RecordPhase.RESULT, result = result)
 
-        // Save: real timestamp + best-effort GPS. The result is already on screen,
-        // so a denied or slow fix costs us coordinates, never the detection.
-        val fix = runCatching {
-            if (location.requestPermission()) location.currentFix() else null
-        }.getOrNull()
-        val saved = detections.add(
-            Detection(
-                speciesId = result.primary.id,
-                confidence = result.confidence,
-                wingbeatHz = result.wingbeatHz,
-                timestampMillis = System.currentTimeMillis(),
-                latitude = fix?.latitude,
-                longitude = fix?.longitude,
-            ),
-        )
-        runCatching { sync.pushDetection(saved) } // best-effort, no-op when offline
+        // Warm the GPS fix while the user reads the result, so tapping Save is
+        // instant. Best-effort throughout: a denied or slow fix costs us the
+        // coordinates, never the detection.
+        viewModelScope.launch {
+            pendingFix = runCatching {
+                if (location.requestPermission()) location.currentFix() else null
+            }.getOrNull()
+        }
+    }
+
+    /**
+     * Persist the result the user is looking at. Explicit rather than automatic:
+     * the design makes "Save to log" a deliberate action, and "Record again"
+     * discards. Uses [capturedAt], not now — saving is not when it was heard.
+     */
+    fun saveResult(onSaved: () -> Unit = {}) {
+        val result = _state.value.result ?: return
+        viewModelScope.launch {
+            val saved = detections.add(
+                Detection(
+                    speciesId = result.primary.id,
+                    confidence = result.confidence,
+                    wingbeatHz = result.wingbeatHz,
+                    timestampMillis = capturedAt,
+                    latitude = pendingFix?.latitude,
+                    longitude = pendingFix?.longitude,
+                ),
+            )
+            runCatching { sync.pushDetection(saved) } // best-effort, no-op when offline
+            reset()
+            onSaved()
+        }
+    }
+
+    /** Acknowledge a surfaced error so the same one is not reported twice. */
+    fun clearError() {
+        if (_state.value.error == RecordError.NONE) return
+        _state.value = _state.value.copy(error = RecordError.NONE)
     }
 
     fun reset() {
         listenJob?.cancel()
+        pendingFix = null
         _state.value = RecordState()
     }
 }

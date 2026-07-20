@@ -71,6 +71,12 @@
     <string name="this_week">Minggu ini</string>
     <string name="consistent_hours">Sesuai jam aktif</string>
     <string name="unusual_hour">Jam tak biasa untuk spesies ini</string>
+    <string name="consistent_hours_note">Terdeteksi %1$s — dalam jam aktifnya (%2$s).</string>
+    <string name="unusual_hour_note">Terdengar %1$s, di luar jam aktifnya (%2$s). Coba rekam ulang.</string>
+    <string name="active_day">Siang · fajar/senja</string>
+    <string name="active_night">Malam</string>
+    <string name="active_dusk_dawn">Malam · senja hingga fajar</string>
+    <string name="photo_placeholder">foto</string>
     <string name="onboard_catch_title">Tangkap sampel bagus</string>
     <string name="onboard_catch_body">Dekati dengungan, tahan stabil, dan jaga bising rendah untuk sayap paling jernih.</string>
     <string name="onboard_offline_title">Sepenuhnya offline</string>

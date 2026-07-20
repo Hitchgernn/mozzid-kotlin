@@ -10,6 +10,20 @@ enum class ActiveWindow {
     DUSK_TO_DAWN; // dusk through dawn (e.g. Anopheles)
 
     val isDayBiter: Boolean get() = this == DAY
+
+    /**
+     * Whether [hour] (0..23, local) falls inside this biting window.
+     *
+     * Checked in both directions on purpose: a night species heard at midday is
+     * just as much a reason to doubt the identification as a day species heard at
+     * night. Takes the hour as a parameter rather than reading the clock so it
+     * stays deterministic and unit-testable.
+     */
+    fun includesHour(hour: Int): Boolean = when (this) {
+        DAY -> hour in 6..18
+        NIGHT -> hour >= 18 || hour < 6
+        DUSK_TO_DAWN -> hour >= 17 || hour < 7
+    }
 }
 
 /**

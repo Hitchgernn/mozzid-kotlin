@@ -15,7 +15,7 @@ import androidx.compose.runtime.remember
 import com.mozzid.data.permission.PermissionBridge
 import com.mozzid.domain.model.AppSettings
 import com.mozzid.domain.model.ThemeBrightness
-import com.mozzid.presentation.HomeScreen
+import com.mozzid.presentation.MozzApp
 import com.mozzid.presentation.ProvideAppLanguage
 import com.mozzid.presentation.theme.AppAccent
 import com.mozzid.presentation.theme.MozzTheme
@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
                         accent = AppAccent.fromName(settings.accentId),
                     ) {
                         BindPermissions(app.permissions)
-                        HomeScreen(app)
+                        MozzApp(app, settings)
                     }
                 }
             }

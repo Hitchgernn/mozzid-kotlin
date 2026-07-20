@@ -71,6 +71,12 @@
     <string name="this_week">This week</string>
     <string name="consistent_hours">Consistent with active hours</string>
     <string name="unusual_hour">Unusual hour for this species</string>
+    <string name="consistent_hours_note">Detected at %1$s — inside its usual %2$s window.</string>
+    <string name="unusual_hour_note">Heard at %1$s, outside its usual %2$s window. Worth a second capture.</string>
+    <string name="active_day">Day · dawn/dusk</string>
+    <string name="active_night">Night</string>
+    <string name="active_dusk_dawn">Night · dusk to dawn</string>
+    <string name="photo_placeholder">photo</string>
     <string name="onboard_catch_title">Catch a good sample</string>
     <string name="onboard_catch_body">Get close to the buzz, hold steady, and keep background noise low for the clearest wingbeat.</string>
     <string name="onboard_offline_title">Works fully offline</string>

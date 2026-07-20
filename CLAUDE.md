@@ -154,9 +154,15 @@ deterministic — keep it that way.
 
 ### Localisation
 
-85 strings in `res/values/strings.xml` (EN) and `res/values-in/strings.xml` (ID —
-`in` is Android's legacy qualifier). Both were generated from the `.arb` files so
-they cannot drift; regenerate rather than hand-editing one side.
+90 strings plus one `<plurals>` in `res/values/strings.xml` (EN) and
+`res/values-in/strings.xml` (ID — `in` is Android's legacy qualifier), with
+identical key sets. The bulk came from the `.arb` files; regenerate rather than
+hand-editing one side. Verify parity with:
+
+```bash
+diff <(grep -oE '(string|plurals) name="[a-z_0-9]+"' app/src/main/res/values/strings.xml | sort) \
+     <(grep -oE '(string|plurals) name="[a-z_0-9]+"' app/src/main/res/values-in/strings.xml | sort)
+```
 
 Bundle language splitting is disabled in `app/build.gradle.kts` — with splits on,
 Play could omit the language a user later picks and an offline app cannot fetch
@@ -182,15 +188,18 @@ Species names are **not** localised: `SpeciesCatalog` hardcodes English, and the
 
 Working and verified on an emulator: both seams, real mic capture, real GPS,
 the full capture flow, Room persistence, the token system, both locales with a
-live in-app switch, 8 passing tests.
+live in-app switch, **all designed screens**, 14 passing tests.
 
-Not built: the real model, Firebase sync, and **most screens**. `HomeScreen` is a
-skeleton proving the flow end to end, and carries a temporary language/theme/accent
-control strip that the real Settings screen replaces. Porting the designed screens
-(onboarding, full record screen with mascot/spectrogram/confidence ring, result,
-history with stylized map, species sheet, morning summary, settings) is the next
-major work — geometry and animation timings are in `PORTING_SPEC.md` §11 and the
-Dart sources. Custom painters become Compose `Canvas`.
+Screens live under `presentation/` by feature (`record/`, `history/`, `settings/`,
+`species/`, `onboarding/`, `morning/`), with `MozzApp.kt` as the tab shell and
+overlay host, and shared widgets in `components/`. Custom vector work is Compose
+`Canvas`: the mascot, the icon set (ported from the design's SVG paths), the
+confidence ring, spectrogram, and offline map. Motion tokens are in
+`theme/Motion.kt`, lifted from the design's CSS keyframes so timings cannot drift.
+
+Not built: the real model, Firebase sync, background/passive listening (the toggle
+and morning summary exist but no background service runs), voice output, and CSV
+export — the export action only confirms with a toast.
 
 Known bug: recorded WAVs overrun the 4s window (~5.4s captured) because the writer
 loop drains after `stop()`. Harmless with the mock, but fix before TFLite work.

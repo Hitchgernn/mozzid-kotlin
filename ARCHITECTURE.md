@@ -1,285 +1,406 @@
-# How MozzID Is Built
+# MozzID Architecture
 
-This document explains how the app is put together, written for people who do
-not write software. There is a short glossary at the end for any term that
-cannot be avoided.
+Technical reference for the Kotlin/Android implementation. For exact design
+tokens, screen geometry, and porting detail from the original Flutter build, see
+[`PORTING_SPEC.md`](PORTING_SPEC.md). For build commands and environment traps,
+see [`CLAUDE.md`](CLAUDE.md).
 
-If you are a developer looking for exact file paths, models, and design values,
-read `PORTING_SPEC.md` instead. This document is the plain-language tour.
-
----
-
-## 1. What the app does
-
-You hear a mosquito. You press and hold a button for about four seconds. The
-phone listens to the sound of its wings, works out which species it most likely
-is, and tells you what disease that species can carry. It saves the result with
-the time and place, so you build up a personal log and map of where mosquitoes
-are showing up.
-
-Two things make this unusual, and they shape every decision below:
-
-**It works with no internet at all.** Not "it works badly offline" — there is no
-server involved in the core experience. Everything happens on the phone. This is
-deliberate: the app is meant for tropical regions, used at night, often far from
-a signal.
-
-**It has to be trustworthy about uncertainty.** The app is making a guess. So it
-always shows how confident it is, and always shows the second-most-likely
-species too. It never presents a guess as a fact.
+Single Gradle module (`:app`), 50 Kotlin source files, ~5.5k lines, 14 unit
+tests. Android only, Kotlin only, no cross-platform layer.
 
 ---
 
-## 2. The one big idea: three layers
+## 1. Constraints that shape the design
 
-The code is organised into three groups. The rule that makes this work is about
-which group is allowed to know about which.
+Three constraints drive every structural decision below. They are worth stating
+first because most of the architecture is downstream of them.
+
+**Offline-first is structural, not aspirational.** There is no required backend.
+The app must install and run to full functionality with no network, no account,
+and no `google-services.json`. This is enforced by making the no-op sync binding
+the default rather than by convention.
+
+**The ML model is deferred.** Wingbeat classification runs behind an interface
+returning a mock. Everything upstream of that interface — capture, timing,
+result presentation, persistence — is finished and testable today, and the real
+model drops in without touching a screen.
+
+**Risk information must survive colour blindness.** Severity is always encoded
+three ways simultaneously (glyph, text label, colour). No code path may signal
+risk by colour alone.
+
+---
+
+## 2. Layer topology
+
+Three layers in one module, separated by package with an enforced dependency
+rule.
 
 ```mermaid
-flowchart LR
-    P["What you see<br/>(screens and buttons)"] --> D["The rules<br/>(what the app knows and decides)"]
-    T["The machinery<br/>(microphone, GPS, storage)"] --> D
+flowchart TD
+    P["presentation/<br/>Compose UI, ViewModels, design tokens"]
+    D["domain/<br/>models, interfaces, pure logic"]
+    T["data/<br/>Room, AudioRecord, FusedLocation, bindings"]
+
+    P --> D
+    T --> D
+    P -. "never" .-> T
 
     classDef core fill:#0d1b2a,stroke:#2dd4bf,color:#e6f4f1;
     class D core;
 ```
 
-Notice both arrows point inward, and there is no arrow between the outer two.
-That is the entire rule.
+`domain/` depends on nothing but the Kotlin stdlib and `kotlinx.coroutines`.
+`presentation/` and `data/` both depend on `domain/` and never on each other.
 
-**The rules layer in the middle** is the heart. It holds the app's knowledge: what
-a mosquito species is, what a detection is, how to work out "your most active
-hour" from a list of detections. This layer knows nothing about phones. It does
-not know what a screen is, what a microphone is, or that Android exists. You
-could lift it out and run it on a completely different kind of device.
+### The purity rule
 
-**The machinery layer** is everything that touches the real world: recording from
-the microphone, reading GPS, saving to storage.
+`domain/` must contain no Android, Compose, or Play Services imports. This is
+mechanically checkable, so verify after touching it:
 
-**The screens layer** is what you see and touch.
-
-### Why bother with this
-
-Three practical payoffs, and they are the reason the structure is worth the
-discipline:
-
-*The important logic can be tested instantly.* Working out "your peak mosquito
-hour" is pure reasoning over a list. Because that logic sits in the middle layer
-and does not touch a phone, it can be checked in under a second without
-installing anything. The app currently has eight such automatic checks that run
-on every build.
-
-*The machinery can be replaced without touching anything else.* This matters
-enormously for the next point.
-
-*Nothing can quietly become essential.* Because the middle layer cannot refer to
-the machinery, no piece of hardware or online service can sneak in and become
-something the app depends on. The offline promise is enforced by the structure
-itself, not by remembering to keep it.
-
----
-
-## 3. The two deliberate gaps
-
-Two parts of this app are not finished, and that is intentional. Rather than
-leaving holes, each is a clearly defined socket that something can be plugged
-into later.
-
-### The species identifier
-
-The part that actually recognises a mosquito from its wingbeat is a machine
-learning model, and it does not exist yet. Building and training it is a large
-separate effort.
-
-So the app defines exactly what such a model must do — take a sound clip, return
-a most-likely species, a runner-up, a confidence score, and a measured wingbeat
-frequency — and today plugs in a **stand-in** that returns realistic-looking
-results without listening to anything.
-
-This is not a shortcut. It means everything around the model is genuinely
-finished and testable now: the recording, the timing, the result display, the
-saving, the history. When the real model is ready it plugs into the same socket
-and one line of the app changes. No screens are rewritten.
-
-The stand-in is honest about being a stand-in: it waits 1.7 seconds to imitate
-real thinking time, and returns confidence between 78 and 94 percent with a
-plausible wingbeat frequency for whichever species it picked.
-
-### The online sync
-
-There is a matching socket for sending detections to a server. Today it is
-filled with a piece that deliberately does nothing at all.
-
-This is how the offline promise is kept honest. The app is not "offline capable
-with sync bolted on" — it is offline, and sync is an optional extra that can be
-plugged in without the rest of the app noticing. If the online piece is missing
-or broken, the app carries on completely unaffected, because the do-nothing
-version is what it expects by default.
-
----
-
-## 4. What happens when you press record
-
-```mermaid
-sequenceDiagram
-    actor You
-    participant App as The screen
-    participant Mic as Microphone
-    participant ID as Species identifier
-    participant Log as Your saved log
-
-    You->>App: Press and hold
-    App->>Mic: Permission granted? Start recording
-    Note over App: Progress ring fills over 4 seconds
-    alt You let go early
-        App->>Mic: Stop and discard
-        App-->>You: Back to the start, nothing saved
-    else You hold the full 4 seconds
-        App->>Mic: Stop, keep the clip
-        App->>ID: What species is this?
-        ID-->>App: Species, runner-up, confidence, frequency
-        App-->>You: Show the result
-        App->>Log: Save it, with time and place
-        Log-->>You: History updates on its own
-    end
+```bash
+grep -rn "^import android\|^import androidx\|^import com.google" \
+  app/src/main/kotlin/com/mozzid/domain/
 ```
 
-Three details in there are worth pulling out, because each is a deliberate
-choice rather than an accident.
+`kotlinx.coroutines`, including `Flow`, **is** permitted — it is pure Kotlin, not
+an Android dependency. Repository interfaces return `Flow` directly.
 
-**Letting go early cancels everything.** A short clip is a bad clip, and a bad
-clip produces a confident-looking wrong answer. So a partial recording is thrown
-away rather than analysed.
+Two consequences worth knowing before reading the models:
 
-**Location is best-effort, never required.** The app asks for your location to
-put the detection on your map. If you refuse, or GPS is switched off, or it is
-slow, the detection still saves with no coordinates attached. Losing a location
-is a small loss. Losing the detection entirely because location failed would be
-a real one, so the app is built so that cannot happen.
-
-**The history updates itself.** Nothing tells the history screen to refresh. It
-watches the stored data continuously, so the moment a detection is saved it
-appears. There is no way for the list to drift out of date with what is actually
-stored.
+- `Severity` and `Species` carry colours as ARGB `Long`, not Compose `Color`.
+  `presentation/theme/SeverityColors.kt` converts them and derives the
+  background/border/icon tints.
+- `AppSettings.accentId` is a `String`, not the `AppAccent` enum, because that
+  enum lives in `presentation/`. `AppAccent.fromName()` resolves it and falls
+  back to the default for anything unrecognised.
 
 ---
 
-## 5. Where information is kept
+## 3. Composition root
 
-Everything lives in one small database file on the phone. Nothing leaves the
-device.
+`Bootstrap` is the only place implementations are selected. Swapping any
+dependency is a one-line change there.
 
-There are exactly two collections in it:
+```kotlin
+Bootstrap(
+    database            = db,
+    detectionRepository = RoomDetectionRepository(db.detectionDao()),
+    speciesRepository   = species,
+    settingsRepository  = RoomSettingsRepository(db.settingsDao()),
+    classifier          = classifier,          // MockSpeciesClassifier today
+    audioRecorder       = MicAudioRecorder(app, permissions),
+    location            = FusedLocationService(app, permissions),
+    sync                = NoopSyncService,     // default binding, stays default
+    permissions         = permissions,
+)
+```
 
-**Your detections** — one row per identification: which species, how confident,
-the measured frequency, when, and where if location was available.
+`Bootstrap.create()` is a `suspend` function — it opens the Room database and
+runs `DemoSeeder`. It is currently assembled in `MainActivity` via
+`produceState`, not in `MozzApplication`.
 
-**Your settings** — language, light or dark, accent colour, and your on/off
-preferences.
+> **Trap.** `MozzApplication` holds a `CompletableDeferred<Bootstrap>` that
+> nothing ever completes. Awaiting it hangs forever. Complete it in `onCreate`
+> or delete it before adding a second entry point.
 
-Settings are stored sparsely, which is a small decision with a useful
-consequence: a preference is only written down once you actually change it, and
-anything not written down falls back to a sensible default. That means new
-settings can be added in future without disturbing anyone's existing data.
-
-On first install the app seeds a handful of example detections around Jakarta,
-so the history and map have something to show before you have recorded anything.
+There is no DI framework. With one composition root and a fixed object graph,
+Hilt would add build-time cost and indirection without removing any wiring.
 
 ---
 
-## 6. How the look and feel is controlled
+## 4. The two seams
 
-No colour, font, or size is written directly into any screen. Every screen asks
-a central source for them.
+These are the only boundaries between the app and anything replaceable.
 
-This is what makes the appearance settings work. When you change the accent
-colour, you are changing one value in one place, and the entire app recolours
-immediately because every screen was already asking that one place. Light and
-dark mode work the same way. There are four accent colours and both brightness
-modes, and the whole app follows any combination.
+### ML seam — `SpeciesClassifier`
 
-### Risk is never shown by colour alone
+```kotlin
+interface SpeciesClassifier {
+    suspend fun load()
+    suspend fun classify(sample: AudioSample): ClassificationResult
+    suspend fun dispose()
+}
 
-This one is a firm rule rather than a preference.
+data class AudioSample(
+    val filePath: String,
+    val durationMillis: Long,
+    val sampleRate: Int = 44100,
+)
+```
 
-Each species carries a risk level, and each level always appears three ways at
-once: a distinct shape, a written label, and a colour.
+`AudioSample` is deliberately the single input type so the eventual switch to
+decoded PCM or a mel-spectrogram does not ripple outward.
 
-| Risk level | Shape | Written as |
+`MockSpeciesClassifier` ignores the audio, delays 1700 ms to imitate on-device
+inference, and returns a primary plus runner-up with 78–94% confidence and a
+per-species wingbeat frequency drawn from that species' real range.
+
+To land the real model: add `org.tensorflow:tensorflow-lite`, bundle weights and
+labels in `assets/`, implement `TfliteSpeciesClassifier` (decode WAV → mel
+spectrogram → CNN → top-2 → map labels through `SpeciesRepository`), and change
+the one binding in `Bootstrap`. No UI or domain changes.
+
+### Backend seam — `SyncService`
+
+```kotlin
+interface SyncService {
+    val isEnabled: Boolean
+    suspend fun pushDetection(detection: Detection)
+    suspend fun pullAggregates()
+}
+```
+
+`NoopSyncService` is a Kotlin `object` with `isEnabled = false` and empty bodies.
+**It is the default binding and stays that way.** A `FirebaseSyncService` must
+fall back to it when `google-services.json` is absent, so a fresh clone builds
+and runs offline with no configuration.
+
+Call sites treat sync as best-effort and never block on it:
+
+```kotlin
+runCatching { sync.pushDetection(saved) }
+```
+
+---
+
+## 5. Device services
+
+Both follow the same shape: interface in `domain/repository/Services.kt`,
+Android implementation in `data/`.
+
+### Audio capture
+
+`MicAudioRecorder` writes **16-bit PCM WAV, 44.1 kHz, mono** via `AudioRecord`.
+Uncompressed is deliberate: the deferred TFLite model can read clips with no
+decode step. Buffer is `AudioRecord.getMinBufferSize() * 2`.
+
+The writer coroutine leaves a 44-byte gap at the head of the file and streams PCM
+after it; `stop()` seeks back with `RandomAccessFile` and patches the RIFF header
+once the final length is known. Cache is pruned to `KEEP_RECENT_CLIPS = 3`.
+
+Shutdown ordering matters and is easy to get wrong: flip the state flag to
+STOPPED so the writer loop exits, `join()` it, and only then release the
+`AudioRecord`. Releasing under an in-flight `read()` crashes natively.
+
+### Location
+
+`FusedLocationService` wraps `FusedLocationProviderClient` with
+`PRIORITY_BALANCED_POWER_ACCURACY`, `FIX_TIMEOUT_MILLIS = 8_000`, and
+`MAX_FIX_AGE_MILLIS = 60_000`.
+
+**It is non-throwing by contract.** Denial, timeout, cancellation, and provider
+failure all resolve to `null`. Losing coordinates is acceptable; losing the
+detection because location failed is not.
+
+---
+
+## 6. Capture pipeline
+
+`RecordViewModel` is the state machine. `CAPTURE_MILLIS = 4000`,
+`TICK_MILLIS = 16` (~60 fps progress updates).
+
+```mermaid
+stateDiagram-v2
+    [*] --> IDLE
+    IDLE --> LISTENING: startHold() and mic granted
+    IDLE --> IDLE: permission denied, error surfaced
+    LISTENING --> IDLE: endHold() before 4s, clip discarded
+    LISTENING --> ANALYZING: 4s elapsed
+    ANALYZING --> RESULT: classifier returns
+    RESULT --> IDLE: reset() or saveResult()
+```
+
+Three behaviours here are deliberate:
+
+**Early release discards.** A short clip yields a confident-looking wrong answer,
+so a partial capture is cancelled rather than classified.
+
+**Saving is explicit.** `finishListening()` presents the result but does not
+persist. `saveResult()` writes the row when the user taps Save. The GPS fix is
+warmed in the background during the result screen so that tap is instant, and the
+row stores `capturedAt` — when the clip was recorded — not when the user got
+round to saving.
+
+**Errors surface.** `RecordError.MIC_DENIED` and `FAILED` are rendered as a
+toast and then cleared via `clearError()`. Without this, a refused microphone
+makes the button appear inert.
+
+---
+
+## 7. Persistence
+
+Room over `mozzid.db`, schema version 1, `exportSchema = false`. Two tables.
+
+### `detections` — the offline source of truth
+
+| Column | Type | Notes |
 |---|---|---|
-| High | Triangle | "High risk" |
-| Moderate | Circle | "Moderate risk" |
-| Low | Square | "Low risk" |
+| `id` | INTEGER PK | autogenerated |
+| `species_id` | TEXT | stable catalogue key |
+| `confidence` | INTEGER | 0–100 |
+| `wingbeat_hz` | INTEGER | measured fundamental |
+| `timestamp` | INTEGER | epoch millis, capture time |
+| `latitude` | REAL? | null when no fix |
+| `longitude` | REAL? | null when no fix |
+| `location_label` | TEXT? | optional place name |
 
-Roughly one in twelve men has some form of colour blindness. If risk were shown
-only as red or amber, the single most important thing on the screen would be
-invisible to them. The shape and the words carry the meaning on their own; the
-colour only reinforces it.
+Reads are `Flow`, ordered `timestamp DESC`, so History updates the moment a row
+lands with no manual refresh path to go stale.
 
-The risk colours also deliberately stay fixed when you change the accent colour,
-so risk never changes appearance based on a cosmetic preference.
+### `settings` — sparse key/value
 
----
+```
+key TEXT PRIMARY KEY, value TEXT
+```
 
-## 7. Languages
+A key is written **only when it changes**; anything absent falls back to the
+`AppSettings` data-class default. This is the whole point of the design: new
+settings need no migration, because absence is already a defined state.
+`RoomSettingsRepository` serialises read-modify-write through a `Mutex` and
+persists only changed keys.
 
-The app is fully available in English and Indonesian. Every piece of text is
-stored in both languages, and the two lists are generated from a single source
-so neither can drift out of sync with the other.
-
-You can change language inside the app, and it takes effect immediately without
-restarting. Your choice overrides whatever language the phone is set to, because
-the person using the app is not always the person who set up the phone.
-
----
-
-## 8. What is actually built today
-
-Being straightforward about this matters more than a tidy status table.
-
-**Working and verified:**
-
-- The three-layer structure, with the middle layer confirmed to have no phone-specific dependencies
-- Both sockets, with the stand-in identifier and the do-nothing sync in place
-- Real microphone recording and real GPS
-- The full press-and-hold sequence: record, analyse, show, save
-- Storage, including the example data
-- The complete colour, font, and spacing system, and all text in both languages
-- Eight automatic checks covering the log filtering and statistics logic
-
-**Not built yet:**
-
-- The real species identification model
-- Optional online sync
-- Most of the finished screens. What exists today is a bare working screen that
-  proves the whole sequence functions end to end. The designed screens —
-  introduction, the full record screen with its animated mascot, the history map,
-  settings — are the next major piece of work.
-
-**Not yet confirmed on real hardware.** The app builds and packages correctly,
-but has not yet been run on a physical phone. The microphone, GPS, and language
-switching are the parts most likely to behave differently on a real device than
-they do on a development machine, so treat those as written but unproven.
+`DemoSeeder` inserts 6 Jakarta-area rows on first install so History, the map,
+and the stats card have content before the first real capture.
 
 ---
 
-## 9. Glossary
+## 8. Presentation
 
-**Layer** — a group of code with a defined job and defined limits on what it is
-allowed to know about.
+### Token system
 
-**Seam or socket** — a written-down description of what a replaceable part must
-do, so different versions can be swapped in without disturbing anything around
-them.
+`MozzColors.of(dark: Boolean, accent: AppAccent)` derives the full palette; it is
+published through `LocalMozzColors`, a `staticCompositionLocalOf`. Four accents
+(teal, lime, amber, indigo), each a quad of base/deep/bright/ink.
 
-**Stand-in** — a placeholder that behaves like the real thing from the outside,
-so everything around it can be finished and tested before the real thing exists.
+Screens read colours from `MozzTheme.colors`, type from `MozzText`, sizes from
+`Dimens`, motion from `Motion`, and copy from `stringResource`. Nothing is
+hardcoded, which is what makes an accent or brightness change recolour the entire
+tree live rather than on restart.
 
-**On-device** — happening on the phone itself, with nothing sent anywhere.
+Severity tints are **fixed rather than accent-derived**, so risk reads identically
+under every theme.
 
-**Wingbeat frequency** — how many times per second a mosquito beats its wings,
-measured in Hertz. Different species beat at different rates, which is what
-makes identification by sound possible at all.
+### Two patterns that cannot be inferred from one file
 
-**Confidence** — how sure the app is, from 0 to 100. Always shown, because a
-guess presented as a certainty is worse than no guess.
+**`PermissionBridge`** exists because services are constructed in `Bootstrap`
+before any Activity exists, and `domain/` cannot reference Android types. It
+exposes a `suspend fun request()`; `MainActivity` binds an
+`ActivityResultLauncher` while composed and unbinds on dispose. With nothing
+bound it resolves `false` rather than hanging. Requests are serialised through a
+`Mutex`, and callers still suspended at dispose are released with `false`.
+
+**`ProvideAppLanguage`** overrides the locale live without recreating the
+Activity. It **must** wrap the Activity as its `ContextWrapper` base and override
+only `getResources()`. A bare `createConfigurationContext()` returns a *detached*
+Context, severing the chain Compose walks to resolve Activity-scoped owners;
+every `rememberLauncherForActivityResult` then throws *"No
+ActivityResultRegistryOwner was provided"*. This crashed the app on every launch
+once. Do not reintroduce it.
+
+### Navigation
+
+Flat and state-driven: three tabs (`Record`, `History`, `Settings`) plus boolean
+overlays (species sheet, morning summary, onboarding, notification banner,
+toast). No nav graph — with three destinations and overlays that each dismiss to
+exactly where they opened from, a graph would add indirection without buying
+anything.
+
+Custom vector work is Compose `Canvas`: the mascot (two independent animation
+loops), the icon set (ported from the design's SVG path data), the confidence
+ring, the spectrogram, and the offline map.
+
+### The map
+
+Deliberately not a tile map — tiles require a network. Detections are projected
+into the frame from the bounding box of the available fixes, so a cluster fills
+the view rather than collapsing to a point. Rows without coordinates are omitted.
+
+Pins are positioned with `Modifier.offset`, not `padding`: the anchor places a
+pin's tip on its coordinate, so values go negative near the edges and `padding`
+throws `IllegalArgumentException` on negative input.
+
+---
+
+## 9. Pure logic and testing
+
+Everything unit-tested lives in `domain/` and takes its inputs explicitly rather
+than reading ambient state. `computeStats` buckets detections into twelve 2-hour
+windows for the peak-activity figure; `applyFilters` takes `nowMillis` as a
+parameter, which is what makes the "this week" range deterministic;
+`ActiveWindow.includesHour(hour)` takes the hour rather than reading the clock.
+
+14 tests across `StatsTest`, `LogFiltersTest`, and `ActiveWindowTest`. Keep
+clock and locale reads out of these functions — that property is the reason they
+are testable at all.
+
+`ActiveWindow.includesHour` is checked in both directions on purpose. A night
+species heard at midday is as much a reason to doubt an identification as a day
+species heard at night, and the active-hours card is the one surface whose job is
+to invite that doubt.
+
+---
+
+## 10. Localisation
+
+90 strings plus one `<plurals>` in `res/values/strings.xml` (EN) and
+`res/values-in/strings.xml` (ID — `in` is Android's legacy qualifier for `id`).
+Key sets are identical across both. The bulk were generated from the reference
+`.arb` files, so prefer regenerating over hand-editing one side.
+
+`resourceConfigurations` is pinned to `en, in`, and AAB language splitting is
+disabled:
+
+```kotlin
+bundle { language { enableSplit = false } }
+```
+
+With splits enabled, Play could omit the language a user later selects in-app,
+and an offline-first app has no way to fetch it back.
+
+Species names are **not** localised — `SpeciesCatalog` hardcodes the Latin
+binomials and common names, and the `.arb` files never carried them either.
+Biting-window labels *are* localised (`active_day`, `active_night`,
+`active_dusk_dawn`).
+
+---
+
+## 11. Toolchain
+
+| Component | Version |
+|---|---|
+| Gradle | 8.13 |
+| Android Gradle Plugin | 8.13.2 |
+| Kotlin | 2.0.21 |
+| Compose BOM | 2024.12.01 |
+| Room (via KSP) | 2.6.1 |
+| compileSdk / targetSdk | 36 |
+| minSdk | 26 (Android 8.0) |
+| Java / JVM target | 17 |
+
+AGP rejects JDK versions above 17, so command-line Gradle needs
+`JAVA_HOME` pointed at a JDK 17 install. Android Studio uses its own bundled
+runtime and is unaffected.
+
+---
+
+## 12. Status and known issues
+
+**Verified on an emulator:** both seams, real microphone capture, real GPS, the
+full record → analyze → result → save flow, Room persistence, all designed
+screens, the token system with live accent and brightness switching, and both
+locales with a live in-app switch.
+
+**Not built:** the TFLite model, Firebase sync, background/passive listening
+(the setting toggles and the morning summary reads real data, but no background
+service runs yet), voice output, and CSV export (the action currently only
+confirms with a toast).
+
+**Known issues:**
+
+- **WAV clips overrun the capture window.** ~5.4 s of PCM is written for a 4 s
+  capture because the writer loop drains after `stop()`. Harmless against the
+  mock, which ignores audio content, but must be fixed before TFLite work —
+  the file length and `durationMillis` currently disagree.
+- **`MozzApplication` holds a `CompletableDeferred` nothing completes.** See §3.
+- **Species names are not localised.** See §10.

@@ -28,6 +28,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -212,10 +213,6 @@ private fun DetectionMap(
     val located = detections.filter { it.latitude != null && it.longitude != null }
 
     var boxSize by remember { mutableStateOf(IntSize.Zero) }
-    // Pins drop in staggered on entry; keyed to the filter result so changing a
-    // filter replays the drop rather than silently swapping pins.
-    var shown by remember(located.map { it.id }) { mutableStateOf(false) }
-    LaunchedEffect(located) { shown = true }
 
     val minLat = located.minOfOrNull { it.latitude!! } ?: 0.0
     val maxLat = located.maxOfOrNull { it.latitude!! } ?: 0.0
@@ -261,49 +258,54 @@ private fun DetectionMap(
             )
         }
 
-        located.forEachIndexed { index, detection ->
-            val fx = ((detection.longitude!! - minLon) / lonSpan).toFloat()
-            val fy = 1f - ((detection.latitude!! - minLat) / latSpan).toFloat()
-            // Inset so pins never touch the rounded corners.
-            val x = 0.12f + fx * 0.76f
-            val y = 0.18f + fy * 0.64f
+        key(located.map { it.id }) {
+            var shown by remember { mutableStateOf(false) }
+            LaunchedEffect(Unit) { shown = true }
 
-            val scale by animateFloatAsState(
-                targetValue = if (shown) 1f else 0f,
-                animationSpec = tween(
-                    durationMillis = Motion.PinDrop,
-                    delayMillis = index * Motion.PinStagger,
-                    easing = Motion.Emphasized,
-                ),
-                label = "pin$index",
-            )
+            located.forEachIndexed { index, detection ->
+                val fx = ((detection.longitude!! - minLon) / lonSpan).toFloat()
+                val fy = 1f - ((detection.latitude!! - minLat) / latSpan).toFloat()
+                // Inset so pins never touch the rounded corners.
+                val x = 0.12f + fx * 0.76f
+                val y = 0.18f + fy * 0.64f
 
-            // Offset, not padding: the anchor point puts the pin's tip on the
-            // coordinate, so the x/y here are routinely negative near the edges
-            // and padding rejects negative values outright.
-            val pinShape = RoundedCornerShape(
-                topStart = 11.dp,
-                topEnd = 11.dp,
-                bottomEnd = 11.dp,
-                bottomStart = 0.dp,
-            )
-            Box(
-                Modifier
-                    .offset {
-                        IntOffset(
-                            x = (boxSize.width * x).roundToInt() - 11.dp.roundToPx(),
-                            y = (boxSize.height * y).roundToInt() - 22.dp.roundToPx(),
-                        )
-                    }
-                    .size(22.dp)
-                    .scale(scale)
-                    .rotate(-45f)
-                    .clip(pinShape)
-                    .background(species.byId(detection.speciesId)?.dotColor ?: c.accent)
-                    .border(2.dp, c.bg, pinShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Box(Modifier.size(6.dp).rotate(45f).clip(CircleShape).background(c.bg))
+                val scale by animateFloatAsState(
+                    targetValue = if (shown) 1f else 0f,
+                    animationSpec = tween(
+                        durationMillis = Motion.PinDrop,
+                        delayMillis = index * Motion.PinStagger,
+                        easing = Motion.Emphasized,
+                    ),
+                    label = "pin$index",
+                )
+
+                // Offset, not padding: the anchor point puts the pin's tip on the
+                // coordinate, so the x/y here are routinely negative near the edges
+                // and padding rejects negative values outright.
+                val pinShape = RoundedCornerShape(
+                    topStart = 11.dp,
+                    topEnd = 11.dp,
+                    bottomEnd = 11.dp,
+                    bottomStart = 0.dp,
+                )
+                Box(
+                    Modifier
+                        .offset {
+                            IntOffset(
+                                x = (boxSize.width * x).roundToInt() - 11.dp.roundToPx(),
+                                y = (boxSize.height * y).roundToInt() - 22.dp.roundToPx(),
+                            )
+                        }
+                        .size(22.dp)
+                        .scale(scale)
+                        .rotate(-45f)
+                        .clip(pinShape)
+                        .background(species.byId(detection.speciesId)?.dotColor ?: c.accent)
+                        .border(2.dp, c.bg, pinShape),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Box(Modifier.size(6.dp).rotate(45f).clip(CircleShape).background(c.bg))
+                }
             }
         }
 

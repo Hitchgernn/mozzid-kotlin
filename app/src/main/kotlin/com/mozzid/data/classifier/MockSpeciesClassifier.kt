@@ -57,10 +57,13 @@ class MockSpeciesClassifier(
 
     /** A believable measured frequency inside each species' known range. */
     private fun freqFor(id: String): Int = when (id) {
-        "aedes" -> 450 + random.nextInt(251)     // 450..700
-        "culex" -> 300 + random.nextInt(151)     // 300..450
-        "anopheles" -> 400 + random.nextInt(201) // 400..600
-        else -> 400 + random.nextInt(300)
+        "aedes_aegypti", "aedes" -> 450 + random.nextInt(251)          // 450..700 Hz
+        "aedes_albopictus" -> 450 + random.nextInt(201)                // 450..650 Hz
+        "anopheles_gambiae", "anopheles" -> 400 + random.nextInt(201)  // 400..600 Hz
+        "anopheles_albimanus" -> 400 + random.nextInt(181)             // 400..580 Hz
+        "culex_pipiens" -> 300 + random.nextInt(151)                   // 300..450 Hz
+        "culex_quinquefasciatus", "culex" -> 300 + random.nextInt(181) // 300..480 Hz
+        else -> 300 + random.nextInt(400)
     }
 
     override suspend fun dispose() {}

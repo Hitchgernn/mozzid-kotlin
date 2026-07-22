@@ -9,3 +9,9 @@
 .cxx/
 local.properties
 app/build/
+google-services.json
+**/google-services.json
+.kotlin/
+graphify-out/
+/wingbeats_model_float32.tflite
+

@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.google.services)
 }
 
 android {
@@ -74,6 +75,18 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.play.services.location)
 
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.firestore.ktx)
+    implementation(libs.firebase.analytics.ktx)
+
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+}
+
+// Make Google Services plugin non-fatal when google-services.json is absent
+tasks.matching { it.name.startsWith("process") && it.name.endsWith("GoogleServices") }.configureEach {
+    val jsonFile = file("google-services.json")
+    if (!jsonFile.exists()) {
+        enabled = false
+    }
 }

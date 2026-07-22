@@ -25,12 +25,12 @@ object DemoSeeder {
         }
 
         val rows = listOf(
-            DetectionEntity(0, "aedes", 87, 612, at(0, 23, 42), -6.2005, 106.8166, "Bedroom"),
-            DetectionEntity(0, "culex", 79, 372, at(0, 22, 5), -6.2011, 106.8172, "Balcony"),
-            DetectionEntity(0, "aedes", 91, 640, at(1, 6, 20), -6.1998, 106.8159, "Kitchen"),
-            DetectionEntity(0, "anopheles", 74, 510, at(2, 2, 15), -6.2021, 106.8181, "Bedroom"),
-            DetectionEntity(0, "aedes", 83, 588, at(4, 19, 50), -6.1989, 106.8150, "Garden"),
-            DetectionEntity(0, "culex", 68, 341, at(6, 21, 30), -6.2030, 106.8190, "Living rm"),
+            DetectionEntity(0, "aedes_aegypti", 87, 612, at(0, 23, 42), -6.2005, 106.8166, "Bedroom"),
+            DetectionEntity(0, "culex_quinquefasciatus", 79, 372, at(0, 22, 5), -6.2011, 106.8172, "Balcony"),
+            DetectionEntity(0, "aedes_albopictus", 91, 640, at(1, 6, 20), -6.1998, 106.8159, "Kitchen"),
+            DetectionEntity(0, "anopheles_gambiae", 74, 510, at(2, 2, 15), -6.2021, 106.8181, "Bedroom"),
+            DetectionEntity(0, "aedes_aegypti", 83, 588, at(4, 19, 50), -6.1989, 106.8150, "Garden"),
+            DetectionEntity(0, "culex_pipiens", 68, 341, at(6, 21, 30), -6.2030, 106.8190, "Living rm"),
         )
         rows.forEach { dao.insert(it) }
     }

@@ -42,11 +42,15 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.mozzid.R
+import com.mozzid.presentation.components.GhostButton
 import com.mozzid.presentation.components.IconClock
 import com.mozzid.presentation.components.IconMic
 import com.mozzid.presentation.components.IconSettings
@@ -71,8 +75,14 @@ fun RecordScreen(
     onEndHold: () -> Unit,
     onOpenHistory: () -> Unit,
     onOpenSettings: () -> Unit,
+    onWavFileSelected: (Uri) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
+    val launcher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent(),
+    ) { uri: Uri? ->
+        uri?.let { onWavFileSelected(it) }
+    }
     val c = MozzTheme.colors
 
     Column(
@@ -122,7 +132,16 @@ fun RecordScreen(
             contentAlignment = Alignment.Center,
         ) {
             when (state.phase) {
-                RecordPhase.IDLE -> IdleButton(onStartHold, onEndHold)
+                RecordPhase.IDLE -> Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    IdleButton(onStartHold, onEndHold)
+                    Spacer(Modifier.height(20.dp))
+                    GhostButton(
+                        label = stringResource(R.string.upload_wav_demo),
+                        onClick = { launcher.launch("audio/*") },
+                    )
+                }
                 RecordPhase.LISTENING -> ListeningStage(state.progress, onEndHold)
                 RecordPhase.ANALYZING -> AnalyzingStage()
                 RecordPhase.RESULT -> Unit // the result view replaces this screen

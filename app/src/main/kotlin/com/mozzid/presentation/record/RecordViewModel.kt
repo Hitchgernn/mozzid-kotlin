@@ -1,5 +1,8 @@
 package com.mozzid.presentation.record
 
+import android.content.Context
+import android.media.MediaMetadataRetriever
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mozzid.domain.classifier.AudioSample
@@ -10,6 +13,7 @@ import com.mozzid.domain.repository.DetectionRepository
 import com.mozzid.domain.repository.GeoFix
 import com.mozzid.domain.repository.LocationService
 import com.mozzid.domain.sync.SyncService
+import java.io.File
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -130,6 +134,49 @@ class RecordViewModel(
     fun clearError() {
         if (_state.value.error == RecordError.NONE) return
         _state.value = _state.value.copy(error = RecordError.NONE)
+    }
+
+    fun analyzeWavFile(uri: Uri, context: Context) {
+        if (_state.value.phase != RecordPhase.IDLE) return
+        viewModelScope.launch {
+            try {
+                val destFile = File(context.cacheDir, "demo_upload.wav")
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    destFile.outputStream().use { output ->
+                        input.copyTo(output)
+                    }
+                } ?: run {
+                    _state.value = _state.value.copy(error = RecordError.FAILED)
+                    return@launch
+                }
+
+                val duration = runCatching {
+                    val retriever = MediaMetadataRetriever()
+                    retriever.setDataSource(context, uri)
+                    val durationStr = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                    retriever.release()
+                    durationStr?.toLongOrNull() ?: CAPTURE_MILLIS
+                }.getOrDefault(CAPTURE_MILLIS)
+
+                _state.value = _state.value.copy(phase = RecordPhase.ANALYZING)
+                val result = classifier.classify(
+                    AudioSample(
+                        filePath = destFile.absolutePath,
+                        durationMillis = duration,
+                    ),
+                )
+                capturedAt = System.currentTimeMillis()
+                _state.value = _state.value.copy(phase = RecordPhase.RESULT, result = result)
+
+                viewModelScope.launch {
+                    pendingFix = runCatching {
+                        if (location.requestPermission()) location.currentFix() else null
+                    }.getOrNull()
+                }
+            } catch (_: Exception) {
+                _state.value = _state.value.copy(error = RecordError.FAILED)
+            }
+        }
     }
 
     fun reset() {

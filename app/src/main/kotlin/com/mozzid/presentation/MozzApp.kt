@@ -41,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -174,13 +175,17 @@ fun MozzApp(boot: Bootstrap, settings: AppSettings) {
                     onOpenSpecies = { sheetSpecies = it },
                 )
 
-                tab == Tab.RECORD -> RecordScreen(
-                    state = recordState,
-                    onStartHold = vm::startHold,
-                    onEndHold = vm::endHold,
-                    onOpenHistory = { tab = Tab.HISTORY },
-                    onOpenSettings = { tab = Tab.SETTINGS },
-                )
+                tab == Tab.RECORD -> {
+                    val context = LocalContext.current
+                    RecordScreen(
+                        state = recordState,
+                        onStartHold = vm::startHold,
+                        onEndHold = vm::endHold,
+                        onOpenHistory = { tab = Tab.HISTORY },
+                        onOpenSettings = { tab = Tab.SETTINGS },
+                        onWavFileSelected = { uri -> vm.analyzeWavFile(uri, context) },
+                    )
+                }
 
                 tab == Tab.HISTORY -> {
                     val now = remember(log) { System.currentTimeMillis() }

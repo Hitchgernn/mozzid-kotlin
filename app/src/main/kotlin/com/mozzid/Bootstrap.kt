@@ -2,6 +2,7 @@ package com.mozzid
 
 import android.content.Context
 import com.mozzid.data.classifier.MockSpeciesClassifier
+import com.mozzid.data.classifier.TfliteSpeciesClassifier
 import com.mozzid.data.local.DemoSeeder
 import com.mozzid.data.local.MozzDatabase
 import com.mozzid.data.local.RoomDetectionRepository
@@ -44,7 +45,7 @@ class Bootstrap private constructor(
             DemoSeeder.seedIfEmpty(db.detectionDao())
 
             val species = SpeciesCatalog()
-            val classifier = MockSpeciesClassifier(species)
+            val classifier = TfliteSpeciesClassifier(species, app)
             classifier.load()
 
             val permissions = PermissionBridge()
@@ -57,7 +58,7 @@ class Bootstrap private constructor(
                 classifier = classifier,
                 audioRecorder = MicAudioRecorder(app, permissions),
                 location = FusedLocationService(app, permissions),
-                sync = NoopSyncService,
+                sync = com.mozzid.data.sync.SyncServiceFactory.create(app),
                 permissions = permissions,
             )
         }

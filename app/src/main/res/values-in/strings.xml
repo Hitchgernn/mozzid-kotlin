@@ -94,4 +94,5 @@
     <string name="tonight">Malam ini</string>
     <string name="mic_denied">Izin mikrofon diperlukan untuk mendengarkan.</string>
     <string name="recording_failed">Tidak bisa memulai perekaman.</string>
+    <string name="upload_wav_demo">Unggah WAV (Demo)</string>
 </resources>

@@ -95,4 +95,5 @@
     <string name="tonight">Tonight</string>
     <string name="mic_denied">Microphone permission is needed to listen.</string>
     <string name="recording_failed">Could not start recording.</string>
+    <string name="upload_wav_demo">Upload WAV (Demo)</string>
 </resources>

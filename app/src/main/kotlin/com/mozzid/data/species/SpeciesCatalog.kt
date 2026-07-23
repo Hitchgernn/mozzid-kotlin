@@ -1,5 +1,6 @@
 package com.mozzid.data.species
 
+import com.mozzid.R
 import com.mozzid.domain.model.ActiveWindow
 import com.mozzid.domain.model.Severity
 import com.mozzid.domain.model.Species
@@ -29,6 +30,7 @@ class SpeciesCatalog : SpeciesRepository {
             "Wear long sleeves at dawn and dusk.",
         ),
         dotColorArgb = 0xFFFF8A7A,
+        photoRes = R.drawable.mosquito_aedes_aegypti,
     )
 
     private val aedesAlbopictus = Species(
@@ -48,6 +50,7 @@ class SpeciesCatalog : SpeciesRepository {
             "Apply EPA-registered insect repellent.",
         ),
         dotColorArgb = 0xFFFF6B6B,
+        photoRes = R.drawable.mosquito_aedes_albopictus,
     )
 
     private val anophelesGambiae = Species(
@@ -68,6 +71,7 @@ class SpeciesCatalog : SpeciesRepository {
             "Cover skin after sunset.",
         ),
         dotColorArgb = 0xFFFFCF6B,
+        photoRes = R.drawable.mosquito_anopheles_gambiae,
     )
 
     private val anophelesAlbimanus = Species(
@@ -87,6 +91,7 @@ class SpeciesCatalog : SpeciesRepository {
             "Support community mosquito control programs.",
         ),
         dotColorArgb = 0xFFFFD97D,
+        photoRes = R.drawable.mosquito_anopheles_albimanus,
     )
 
     private val culexPipiens = Species(
@@ -106,6 +111,7 @@ class SpeciesCatalog : SpeciesRepository {
             "Use sleep mosquito nets if unscreened.",
         ),
         dotColorArgb = 0xFF7FD0FF,
+        photoRes = R.drawable.mosquito_culex_pipiens,
     )
 
     private val culexQuinquefasciatus = Species(
@@ -126,6 +132,7 @@ class SpeciesCatalog : SpeciesRepository {
             "Fit window and door screens.",
         ),
         dotColorArgb = 0xFF4AC3FF,
+        photoRes = R.drawable.mosquito_culex_quinquefasciatus,
     )
 
     private val everySpecies = listOf(

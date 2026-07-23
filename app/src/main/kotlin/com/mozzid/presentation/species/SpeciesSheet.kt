@@ -6,6 +6,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,7 +33,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -140,13 +143,25 @@ fun BoxScope.SpeciesSheet(
                     .padding(horizontal = Dimens.pagePad)
                     .padding(top = 16.dp, bottom = 30.dp),
             ) {
-                StripedPlaceholder(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(150.dp),
-                    radius = 20.dp,
-                    label = "${shown.scientificName} — ${stringResource(R.string.photo_placeholder)}",
-                )
+                val photoModifier = Modifier
+                    .fillMaxWidth()
+                    .height(180.dp)
+                    .clip(RoundedCornerShape(20.dp))
+
+                if (shown.photoRes != null) {
+                    Image(
+                        painter = painterResource(shown.photoRes),
+                        contentDescription = shown.scientificName,
+                        contentScale = ContentScale.Crop,
+                        modifier = photoModifier,
+                    )
+                } else {
+                    StripedPlaceholder(
+                        photoModifier,
+                        radius = 20.dp,
+                        label = "${shown.scientificName} — ${stringResource(R.string.photo_placeholder)}",
+                    )
+                }
 
                 Spacer(Modifier.height(16.dp))
                 Text(shown.scientificName, style = MozzText.species.copy(color = c.text))

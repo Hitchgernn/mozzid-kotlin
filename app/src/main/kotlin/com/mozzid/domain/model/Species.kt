@@ -43,4 +43,6 @@ data class Species(
     val note: String,
     val tips: List<String>,
     val dotColorArgb: Long,     // map-pin / list colour, as ARGB (see [Severity])
+    /** Drawable resource ID for the species photo, or null if unavailable. */
+    val photoRes: Int? = null,
 )

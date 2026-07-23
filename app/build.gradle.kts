@@ -21,8 +21,12 @@ android {
     }
 
     buildTypes {
+        debug {
+            // testOnly flag set by Android Studio — use release build for sharing
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("debug") // debug key, shareable APK
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",

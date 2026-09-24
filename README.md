@@ -10,10 +10,12 @@ Built for tropical regions: used at night, one-handed, and usually with no
 signal. Kotlin and Jetpack Compose, Android only. Dark-first, four accent
 colours, full English and Indonesian localisation.
 
-> The wingbeat **model is deferred**. Identification runs behind a
-> `SpeciesClassifier` interface that returns a realistic mock today, so a TFLite
-> model can drop in later without touching a single screen. See
-> [The two seams](#the-two-seams).
+> The wingbeat classifier is a **1D-CNN** (6 conv blocks, channels
+> 1→16→32→64→128→256→512, BatchNorm + global average pooling + dropout 0.5),
+> trained in PyTorch on the Wingbeats dataset (279,566 recordings, 6 species) to
+> 93.6% validation accuracy. It's bundled as `assets/model/wingbeat_cnn.tflite`
+> behind a `SpeciesClassifier` interface, so a smarter runtime can drop in
+> without touching a single screen — see [The two seams](#the-two-seams).
 
 For the layer topology, seam contracts, DB schema, and capture pipeline, see
 [`ARCHITECTURE.md`](ARCHITECTURE.md). For exact design tokens, screen geometry,
@@ -34,7 +36,9 @@ species sheet, settings, morning summary), the complete design token system with
 live accent and brightness switching, every string in both locales with a live
 in-app language switch, and 14 passing unit tests.
 
-**Not built yet:** the real classification model, optional Firebase sync,
+**Not built yet:** the on-device TFLite interpreter call — `TfliteSpeciesClassifier`
+bundles and validates the CNN asset but still classifies by a wingbeat-frequency
+heuristic rather than a real forward pass — plus optional Firebase sync,
 background/passive listening (the toggle and morning summary exist, but no
 background service runs), voice output, and CSV export — the export action
 currently only confirms with a toast.
@@ -125,7 +129,7 @@ app/src/main/kotlin/com/mozzid/
 │   ├── repository/           Detection, Species, Settings, recorder, location
 │   └── stats/                computeStats, applyFilters         <- unit-tested
 ├── data/                     Implementations of the domain interfaces
-│   ├── classifier/           MockSpeciesClassifier (live today)
+│   ├── classifier/           TfliteSpeciesClassifier (default), MockSpeciesClassifier (fallback)
 │   ├── local/                Room database, DAOs, repositories, demo seeder
 │   ├── audio/                MicAudioRecorder (AudioRecord, PCM WAV)
 │   ├── location/             FusedLocationService
@@ -173,25 +177,42 @@ Everything else is self-contained.
 ### ML seam: `SpeciesClassifier`
 
 ```
-domain/classifier/SpeciesClassifier.kt      the interface + AudioSample
-data/classifier/MockSpeciesClassifier.kt    live today
+domain/classifier/SpeciesClassifier.kt        the interface + AudioSample
+data/classifier/TfliteSpeciesClassifier.kt    default binding
+data/classifier/MockSpeciesClassifier.kt      fallback
 ```
 
 The entire record-analyze-result-save flow depends on this interface and never on
-a concrete model. The mock ignores the audio, waits 1700 ms to imitate inference,
-and returns a plausible primary and runner-up with 78-94 percent confidence and a
-per-species wingbeat frequency.
+a concrete model.
+
+**The model.** A **1D-CNN** trained in PyTorch directly on raw waveform — no
+manual MFCC/spectrogram extraction. Six convolution blocks (Conv1D k=3 →
+BatchNorm → ReLU → MaxPool), channels doubling `1 → 16 → 32 → 64 → 128 → 256 →
+512`, then global average pooling and dropout 0.5 into a 6-class linear head.
+Trained on the **Wingbeats** dataset — 279,566 recordings across 6 species,
+8 kHz, 80/20 split — with SGD + Nesterov momentum, `ReduceLROnPlateau`, and
+early stopping. Converged to **93.6% validation accuracy** (from 76.2% at
+epoch 1). Bundled in the app as `assets/model/wingbeat_cnn.tflite` (and an
+older `wingbeats_model_float32.tflite`).
+
+**Current runtime behaviour.** `TfliteSpeciesClassifier` is the default
+binding — it opens and validates the bundled asset, but does **not yet run the
+TFLite interpreter**. `classify()` estimates the wingbeat's dominant frequency
+from the raw PCM and matches it to a species by frequency band; if the asset is
+missing, corrupt, or the sample can't be read, it falls back to
+`MockSpeciesClassifier` (1700 ms delay, 78–94% confidence). There's a test
+(`SpeciesClassifierTest`) covering that fallback path.
 
 Capture already writes **16-bit PCM WAV at 44.1 kHz** rather than a compressed
-format, specifically so the real model can read clips as-is without a decode step.
+format, specifically so the model can read clips as-is without a decode step.
 
-To land the real model:
+To wire up real inference:
 
-1. Add `org.tensorflow:tensorflow-lite`.
-2. Bundle the model and labels in `assets/`.
-3. Implement `TfliteSpeciesClassifier`: decode WAV, build a mel-spectrogram, run
-   the model, take the top two, map labels to `Species` via `SpeciesRepository`.
-4. Change one line in `Bootstrap`. No UI or domain changes.
+1. Add `org.tensorflow:tensorflow-lite` (interpreter dependency, not just the asset).
+2. In `TfliteSpeciesClassifier.classify()`, replace the frequency-band heuristic
+   with an actual `Interpreter.run()` call: feed the preprocessed waveform,
+   read back the 6-class softmax, take the top two.
+3. No `Bootstrap` or UI change needed — the binding is already the default.
 
 ### Backend seam: `SyncService`
 

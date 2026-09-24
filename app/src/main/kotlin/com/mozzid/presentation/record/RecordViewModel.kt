@@ -15,6 +15,8 @@ import com.mozzid.domain.repository.LocationService
 import com.mozzid.domain.sync.SyncService
 import java.io.File
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -92,17 +94,21 @@ class RecordViewModel(
         val (path, duration) = runCatching { recorder.stop() }.getOrElse { "" to CAPTURE_MILLIS }
         _state.value = _state.value.copy(phase = RecordPhase.ANALYZING)
 
-        val result = classifier.classify(AudioSample(filePath = path, durationMillis = duration))
-        capturedAt = System.currentTimeMillis()
-        _state.value = _state.value.copy(phase = RecordPhase.RESULT, result = result)
-
-        // Warm the GPS fix while the user reads the result, so tapping Save is
-        // instant. Best-effort throughout: a denied or slow fix costs us the
-        // coordinates, never the detection.
-        viewModelScope.launch {
-            pendingFix = runCatching {
-                if (location.requestPermission()) location.currentFix() else null
-            }.getOrNull()
+        // Run classification and GPS concurrently — both finish before result is shown,
+        // so pendingFix is always populated when the user taps Save.
+        coroutineScope {
+            val resultDeferred = async {
+                classifier.classify(AudioSample(filePath = path, durationMillis = duration))
+            }
+            val fixDeferred = async {
+                runCatching {
+                    if (location.requestPermission()) location.currentFix() else null
+                }.getOrNull()
+            }
+            val result = resultDeferred.await()
+            pendingFix = fixDeferred.await()
+            capturedAt = System.currentTimeMillis()
+            _state.value = _state.value.copy(phase = RecordPhase.RESULT, result = result)
         }
     }
 
@@ -159,19 +165,26 @@ class RecordViewModel(
                 }.getOrDefault(CAPTURE_MILLIS)
 
                 _state.value = _state.value.copy(phase = RecordPhase.ANALYZING)
-                val result = classifier.classify(
-                    AudioSample(
-                        filePath = destFile.absolutePath,
-                        durationMillis = duration,
-                    ),
-                )
-                capturedAt = System.currentTimeMillis()
-                _state.value = _state.value.copy(phase = RecordPhase.RESULT, result = result)
 
-                viewModelScope.launch {
-                    pendingFix = runCatching {
-                        if (location.requestPermission()) location.currentFix() else null
-                    }.getOrNull()
+                // Run classification and GPS concurrently — both finish before result is shown.
+                coroutineScope {
+                    val resultDeferred = async {
+                        classifier.classify(
+                            AudioSample(
+                                filePath = destFile.absolutePath,
+                                durationMillis = duration,
+                            ),
+                        )
+                    }
+                    val fixDeferred = async {
+                        runCatching {
+                            if (location.requestPermission()) location.currentFix() else null
+                        }.getOrNull()
+                    }
+                    val result = resultDeferred.await()
+                    pendingFix = fixDeferred.await()
+                    capturedAt = System.currentTimeMillis()
+                    _state.value = _state.value.copy(phase = RecordPhase.RESULT, result = result)
                 }
             } catch (_: Exception) {
                 _state.value = _state.value.copy(error = RecordError.FAILED)

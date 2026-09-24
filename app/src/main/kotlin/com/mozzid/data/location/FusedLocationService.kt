@@ -73,6 +73,6 @@ class FusedLocationService(
             Manifest.permission.ACCESS_FINE_LOCATION,
         )
         const val FIX_TIMEOUT_MILLIS = 8_000L
-        const val MAX_FIX_AGE_MILLIS = 60_000L
+        const val MAX_FIX_AGE_MILLIS = 10 * 60 * 1_000L  // 10 min — accepts emulator cached fix
     }
 }

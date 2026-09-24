@@ -8,7 +8,7 @@ import java.util.Calendar
  * Mirrors the original app's seed rows (Jakarta coords).
  */
 object DemoSeeder {
-    const val enabled = true
+    const val enabled = false
 
     suspend fun seedIfEmpty(dao: DetectionDao) {
         if (!enabled) return
